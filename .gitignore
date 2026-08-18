@@ -1,0 +1,15 @@
+# Python / Environment
+__pycache__/
+*.py[cod]
+.venv/
+env/
+
+# Data & Checkpoints
+data/
+outputs/
+results*/
+datasets*/
+*.sqlite
+*.db
+wandb/
+.ipynb_checkpoints/
