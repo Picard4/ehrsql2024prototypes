@@ -12,7 +12,6 @@ from trl import SFTConfig, SFTTrainer
 """File Constants"""
 processed_train_file = "./datasets-processed/train_processed.json"
 processed_val_file = "./datasets-processed/val_processed.json"
-processed_test_file = "./datasets-processed/test_processed.json"
 
 baseline_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable."""
 schema_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable. The following is the database schema:
@@ -242,11 +241,10 @@ features = Features({
 
 dataset = load_dataset("json", features=features, data_files={
     train_set_name: processed_train_file,
-    val_set_name: processed_val_file,
-    test_set_name: processed_test_file
+    val_set_name: processed_val_file
 })
 
-def train_and_eval_model(model, eval_args, role_string, model_nickname, train_args=None, lora_args=None):
+def train_and_eval_model(model, role_string, model_nickname, train_args=None, eval_args=None, lora_args=None):
     def format_chat(example):
         inputs = example[input_name]
         labels = example[label_name]
@@ -268,13 +266,12 @@ def train_and_eval_model(model, eval_args, role_string, model_nickname, train_ar
     
     train_dataset = dataset[train_set_name].map(format_chat, batched=True, remove_columns=dataset[train_set_name].column_names)
     val_dataset = dataset[val_set_name].map(format_chat, batched=True, remove_columns=dataset[val_set_name].column_names)
-    test_dataset = dataset[test_set_name].map(format_chat, batched=True, remove_columns=dataset[test_set_name].column_names)
-
+    
     if lora_args is not None:
         model = get_peft_model(model, lora_args)
 
     if train_args is not None:
-        print(f"Training {model_nickname}...")
+        print(f"\nTraining {model_nickname}...")
         train_args.output_dir = f"./results-{model_nickname}"
         trainer = SFTTrainer(
             model=model,
@@ -290,16 +287,17 @@ def train_and_eval_model(model, eval_args, role_string, model_nickname, train_ar
             model.enable_input_require_grads()
         trainer.train()
 
-    test_trainer = SFTTrainer(
-        model=model,
-        args=eval_args,
-        train_dataset=train_dataset,  # This goes unused, but I have to pass a train_dataset to avoid a crash!
-        eval_dataset=test_dataset,
-        processing_class=tokenizer
-    )
-    print(f"Evaluating {model_nickname} on the test set...")
-    test_results = test_trainer.evaluate()
-    print(test_results)
+    if eval_args is not None:
+        eval_trainer = SFTTrainer(
+            model=model,
+            args=eval_args,
+            train_dataset=train_dataset,  # This goes unused, but I have to pass a train_dataset to avoid a crash!
+            eval_dataset=val_dataset,
+            processing_class=tokenizer
+        )
+        print(f"\nEvaluating {model_nickname} on the validation set...")
+        eval_results = eval_trainer.evaluate()
+        print(eval_results)
 
 
 """Training and LoRA Arguments"""
@@ -352,18 +350,18 @@ evaluation_args = SFTConfig(
 nickname = "Baseline-Model-1_No-Schema-No-Training"
 train_and_eval_model(
     model=baseline_model,
-    eval_args=evaluation_args,
     role_string=baseline_role_string,
-    model_nickname=nickname
+    model_nickname=nickname,
+    eval_args=evaluation_args
 )
 
 # Baseline 2
 nickname = "Baseline-Model-2_Full-Schema-No-Training"
 train_and_eval_model(
     model=baseline_model,
-    eval_args=evaluation_args,
     role_string=schema_role_string,
-    model_nickname=nickname
+    model_nickname=nickname,
+    eval_args=evaluation_args
 )
 del baseline_model
 gc.collect()
@@ -374,7 +372,6 @@ nickname = "Model-1_Training-Only-No-Schema"
 model_1 = copy.deepcopy(model)
 train_and_eval_model(
     model=model_1,
-    eval_args=evaluation_args,
     role_string=baseline_role_string,
     model_nickname=nickname,
     train_args=training_args,
@@ -389,7 +386,6 @@ nickname = "Model-2_Full-Schema-and-Training"
 model_2 = model  # TODO: Deep copy if more models are added in the future
 train_and_eval_model(
     model=model_2,
-    eval_args=evaluation_args,
     role_string=schema_role_string,
     model_nickname=nickname,
     train_args=training_args,
