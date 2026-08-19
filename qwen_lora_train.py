@@ -1,17 +1,115 @@
 # import sys
 # !{sys.executable} -m pip install "torch<2.5.0" "transformers>=4.42.0" huggingface_hub tiktoken einops transformers_stream_generator datasets accelerate peft ipywidgets trl
 
+# Main script imports
 import torch
 import copy
 import gc
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, EarlyStoppingCallback
 from datasets import load_dataset, Features, Value
 from peft import LoraConfig, get_peft_model
 from trl import SFTConfig, SFTTrainer
 
+# Score imports
+import json
+import os
+import sys
+import sqlite3
+import numpy as np
+import pandas as pd
+import multiprocessing as mp
+from scoring.scoring_utils import reliability_score, penalize, execute_all_distributed, execute_all
+from scoring.postprocessing import post_process_sql
+
 """File Constants"""
 processed_train_file = "./datasets-processed/train_processed.json"
 processed_val_file = "./datasets-processed/val_processed.json"
+
+# Inference constants
+data_file_name = 'data.json'
+reference_file_name = 'label.json'
+prediction_file_name = 'prediction.json'
+data_dir = os.path.join('./inference/', 'data')
+reference_dir = os.path.join('./inference/', 'ref')
+prediction_dir = os.path.join('./inference/', 'res')
+
+"""Score Calculation Function (taken from scoring.py)"""
+def calculate_score():
+    print('Load Data')
+    with open(os.path.join(reference_dir, reference_file_name)) as f:
+        real_dict = json.load(f)
+    with open(os.path.join(prediction_dir, prediction_file_name)) as f:
+        pred_dict = json.load(f)
+    assert set(real_dict) == set(pred_dict), "IDs do not match"
+
+    print('Executing Queries')
+    real_dict = {id_: post_process_sql(real_dict[id_]) for id_ in real_dict}
+    pred_dict = {id_: post_process_sql(pred_dict[id_]) for id_ in pred_dict}
+
+    current_real_dir = os.path.dirname(os.path.realpath(__file__))
+    db_path = os.path.join(current_real_dir, 'mimic_iv.sqlite')
+    if not os.path.exists(db_path):
+        raise Exception('File does not exist: %s' % db_path)
+
+    num_workers = mp.cpu_count()
+    if num_workers > 1:
+        real_result = execute_all_distributed(real_dict, db_path, tag='real', num_workers=num_workers)
+        pred_result = execute_all_distributed(pred_dict, db_path, tag='pred', num_workers=num_workers)
+    else:
+        real_result = execute_all(real_dict, db_path, tag='real')
+        pred_result = execute_all(pred_dict, db_path, tag='pred')
+
+    print('Checking Accuracy')
+    scores = reliability_score(real_result, pred_result)
+    accuracy0 = penalize(scores, penalty=0)
+    accuracy5 = penalize(scores, penalty=5)
+    accuracy10 = penalize(scores, penalty=10)
+    accuracyN = penalize(scores, penalty=len(scores))
+
+    print('Scores:')
+    scores_dict = {
+        'accuracy0': accuracy0*100,
+        'accuracy5': accuracy5*100,
+        'accuracy10': accuracy10*100,
+        'accuracyN': accuracyN*100
+    }
+    return scores_dict
+
+def generate_query(model, role_string, question):
+    messages = [
+        {"role": "system", "content": role_string},
+        {"role": "user", "content": question}
+    ]
+
+    prompt = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+
+    inputs = tokenizer(
+        prompt,
+        return_tensors="pt"
+    ).to(model.device)
+
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=256,
+            do_sample=False
+        )
+
+    generated_tokens = outputs[0][inputs["input_ids"].shape[1]:]
+
+    prediction = tokenizer.decode(
+        generated_tokens,
+        skip_special_tokens=True
+    ).strip()
+
+    return prediction
+
+def calculate_accuracy(model, role_string, dataset):
+    pass
 
 baseline_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable."""
 schema_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable. The following is the database schema:
@@ -278,7 +376,13 @@ def train_and_eval_model(model, role_string, model_nickname, train_args=None, ev
             args=train_args,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
-            processing_class=tokenizer
+            processing_class=tokenizer,
+            callbacks=[
+                EarlyStoppingCallback(
+                    early_stopping_patience=3,
+                    early_stopping_threshold=0.0
+                )
+            ]
         )
         model.train()
         # This is a built-in PEFT helper that ensures embedding layers 
@@ -288,6 +392,7 @@ def train_and_eval_model(model, role_string, model_nickname, train_args=None, ev
         trainer.train()
 
     if eval_args is not None:
+        model.eval()
         eval_trainer = SFTTrainer(
             model=model,
             args=eval_args,
@@ -296,6 +401,11 @@ def train_and_eval_model(model, role_string, model_nickname, train_args=None, ev
             processing_class=tokenizer
         )
         print(f"\nEvaluating {model_nickname} on the validation set...")
+
+        # Accuracy10
+
+
+        # Validation loss
         eval_results = eval_trainer.evaluate()
         print(eval_results)
 
@@ -325,9 +435,17 @@ training_args = SFTConfig(
     weight_decay=0.01,
     logging_dir="./logs",
     logging_steps=10,
+
     eval_strategy="steps",
     eval_steps=50,
+
     save_strategy="epoch",
+    save_steps=50,
+
+    load_best_model_at_end=True,
+    metric_for_best_model="eval_loss",
+    greater_is_better=False,
+
     learning_rate=1e-4,
     fp16=fp16,
     gradient_checkpointing=True,
@@ -355,6 +473,7 @@ train_and_eval_model(
     eval_args=evaluation_args
 )
 
+"""
 # Baseline 2
 nickname = "Baseline-Model-2_Full-Schema-No-Training"
 train_and_eval_model(
@@ -394,3 +513,4 @@ train_and_eval_model(
 del model_2
 gc.collect()
 torch.cuda.empty_cache()
+"""
