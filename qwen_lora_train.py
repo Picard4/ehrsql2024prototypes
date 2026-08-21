@@ -1,25 +1,16 @@
 # import sys
 # !{sys.executable} -m pip install "torch<2.5.0" "transformers>=4.42.0" huggingface_hub tiktoken einops transformers_stream_generator datasets accelerate peft ipywidgets trl
 
-# Main script imports
 import torch
 import copy
 import gc
+import os
+import json
 from transformers import AutoModelForCausalLM, AutoTokenizer, EarlyStoppingCallback
 from datasets import load_dataset, Features, Value
 from peft import LoraConfig, get_peft_model
 from trl import SFTConfig, SFTTrainer
-
-# Score imports
-import json
-import os
-import sys
-import sqlite3
-import numpy as np
-import pandas as pd
-import multiprocessing as mp
-from scoring.scoring_utils import reliability_score, penalize, execute_all_distributed, execute_all
-from scoring.postprocessing import post_process_sql
+from inference_utils import calculate_score_from_model
 
 """File Constants"""
 processed_train_file = "./datasets-processed/train_processed.json"
@@ -31,93 +22,9 @@ reference_file_name = 'label.json'
 prediction_file_name = 'prediction.json'
 data_dir = os.path.join('./inference/', 'data')
 reference_dir = os.path.join('./inference/', 'ref')
-prediction_dir = os.path.join('./inference/', 'res')
+prediction_dir = os.path.join('./inference/training', 'res')
 
-"""Score Calculation Function (taken from scoring.py)"""
-def calculate_score():
-    print('Load Data')
-    with open(os.path.join(reference_dir, reference_file_name)) as f:
-        real_dict = json.load(f)
-    with open(os.path.join(prediction_dir, prediction_file_name)) as f:
-        pred_dict = json.load(f)
-    assert set(real_dict) == set(pred_dict), "IDs do not match"
-
-    print('Executing Queries')
-    real_dict = {id_: post_process_sql(real_dict[id_]) for id_ in real_dict}
-    pred_dict = {id_: post_process_sql(pred_dict[id_]) for id_ in pred_dict}
-
-    current_real_dir = os.path.dirname(os.path.realpath(__file__))
-    db_path = os.path.join(current_real_dir, 'mimic_iv.sqlite')
-    if not os.path.exists(db_path):
-        raise Exception('File does not exist: %s' % db_path)
-
-    num_workers = mp.cpu_count()
-    if num_workers > 1:
-        real_result = execute_all_distributed(real_dict, db_path, tag='real', num_workers=num_workers)
-        pred_result = execute_all_distributed(pred_dict, db_path, tag='pred', num_workers=num_workers)
-    else:
-        real_result = execute_all(real_dict, db_path, tag='real')
-        pred_result = execute_all(pred_dict, db_path, tag='pred')
-
-    print('Checking Accuracy')
-    scores = reliability_score(real_result, pred_result)
-    accuracy0 = penalize(scores, penalty=0)
-    accuracy5 = penalize(scores, penalty=5)
-    accuracy10 = penalize(scores, penalty=10)
-    accuracyN = penalize(scores, penalty=len(scores))
-
-    print('Scores:')
-    scores_dict = {
-        'accuracy0': accuracy0*100,
-        'accuracy5': accuracy5*100,
-        'accuracy10': accuracy10*100,
-        'accuracyN': accuracyN*100
-    }
-    return scores_dict
-
-def generate_query(model, role_string, question):
-    messages = [
-        {"role": "system", "content": role_string},
-        {"role": "user", "content": question}
-    ]
-
-    prompt = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True
-    )
-
-    inputs = tokenizer(
-        prompt,
-        return_tensors="pt"
-    ).to(model.device)
-
-    with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=256,
-            do_sample=False
-        )
-
-    generated_tokens = outputs[0][inputs["input_ids"].shape[1]:]
-
-    prediction = tokenizer.decode(
-        generated_tokens,
-        skip_special_tokens=True
-    ).strip()
-
-    return prediction
-
-def calculate_accuracy(model, role_string, dataset):
-    results = {}
-    for example in dataset['data']:
-        query = generate_query(model, role_string, example['question'])
-        results[example['id']] = query
-    os.makedirs(prediction_dir, exist_ok=True)
-    with open(os.path.join(prediction_dir, prediction_file_name), 'w') as f:
-        json.dump(results, f, indent=4)
-    return calculate_score()
-
+"""Functionality Constants"""
 baseline_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable."""
 schema_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable. The following is the database schema:
 ```sql
@@ -316,6 +223,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 baseline_model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 
+# pad_token setttings to prevent logs from getting flooded
 tokenizer.pad_token = tokenizer.eos_token
 baseline_model.generation_config.pad_token_id = tokenizer.pad_token_id
 model.generation_config.pad_token_id = tokenizer.pad_token_id
@@ -414,12 +322,15 @@ def train_and_eval_model(model, role_string, model_nickname, train_args=None, ev
         print(f"\nEvaluating {model_nickname} on the validation set...")
 
         # Accuracy10
+        print("Evaluating Accuracy...")
         with open(os.path.join(data_dir, data_file_name)) as f:
             valid_data = json.load(f)  # We need to know the ids for the validation data, so I need to load it from a separate file.
-        accuracy = calculate_accuracy(model, role_string, valid_data)
+        prediction_file_name = f"{model_nickname}_{prediction_file_name}"
+        accuracy = calculate_score_from_model(model, role_string, valid_data, reference_dir, reference_file_name, prediction_dir, prediction_file_name)
         print(accuracy)
 
         # Validation loss
+        print("Evaluating Loss...")
         eval_results = eval_trainer.evaluate()
         print(eval_results)
 
@@ -457,10 +368,6 @@ training_args = SFTConfig(
 
     save_strategy=eval_save_strategy,
     save_steps=eval_save_steps,
-
-    load_best_model_at_end=True,
-    metric_for_best_model="eval_loss",
-    greater_is_better=False,
 
     learning_rate=1e-4,
     fp16=fp16,
