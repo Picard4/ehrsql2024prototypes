@@ -396,7 +396,6 @@ train_and_eval_model(
     eval_args=evaluation_args
 )
 
-"""
 # Baseline 2
 nickname = "Baseline-Model-2_Full-Schema-No-Training"
 train_and_eval_model(
@@ -436,4 +435,3 @@ train_and_eval_model(
 del model_2
 gc.collect()
 torch.cuda.empty_cache()
-"""
