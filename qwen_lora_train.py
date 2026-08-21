@@ -315,6 +315,9 @@ model_name = "Qwen/Qwen2.5-1.5B"
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 baseline_model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.pad_token_id = tokenizer.eos_token_id
 
 # Necessary formatting to make Qwen understand the messages and calculate the loss only on the SQL
 tokenizer_jinja_old = """{%- if (message.role == "user") or (message.role == "system" and not loop.first) or (message.role == "assistant" and not message.tool_calls) %}
