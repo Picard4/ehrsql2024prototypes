@@ -47,7 +47,7 @@ def calculate_score_from_files(reference_path, prediction_path):
     }
     return scores_dict
 
-def generate_query(model, role_string, question, tokenizer):
+def generate_query(model, tokenizer, role_string, question):
     messages = [
         {"role": "system", "content": role_string},
         {"role": "user", "content": question}
@@ -80,13 +80,13 @@ def generate_query(model, role_string, question, tokenizer):
 
     return prediction
 
-def calculate_score_from_model(model, role_string, dataset, reference_dir, reference_file_name, prediction_dir, prediction_file_name):
+def calculate_score_from_model(model, role_string, dataset, tokenizer, reference_dir, reference_file_name, prediction_dir, prediction_file_name):
     results = {}
     reference_path = os.path.join(reference_dir, reference_file_name)
     prediction_path = os.path.join(prediction_dir, prediction_file_name)
     print(print(f"Predictions will be saved to {prediction_path} and compared to the contents of {reference_path}"))
     for example in dataset['data']:
-        query = generate_query(model, role_string, example['question'])
+        query = generate_query(model, tokenizer, role_string, example['question'])
         results[example['id']] = query
     os.makedirs(prediction_dir, exist_ok=True)
     with open(prediction_path, 'w') as f:
