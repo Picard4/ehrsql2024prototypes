@@ -109,7 +109,14 @@ def generate_query(model, role_string, question):
     return prediction
 
 def calculate_accuracy(model, role_string, dataset):
-    print(dataset)
+    results = {}
+    for example in dataset['data']:
+        query = generate_query(model, role_string, example['question'])
+        results[example['id']] = query
+    os.makedirs(prediction_dir, exist_ok=True)
+    with open(os.path.join(prediction_dir, prediction_file_name), 'w') as f:
+        json.dump(results, f, indent=4)
+    return calculate_score()
 
 baseline_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable."""
 schema_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable. The following is the database schema:
@@ -406,6 +413,7 @@ def train_and_eval_model(model, role_string, model_nickname, train_args=None, ev
         with open(os.path.join(data_dir, data_file_name)) as f:
             valid_data = json.load(f)  # We need to know the ids for the validation data, so I need to load it from a separate file.
         accuracy = calculate_accuracy(model, role_string, valid_data)
+        print(accuracy)
 
         # Validation loss
         eval_results = eval_trainer.evaluate()
