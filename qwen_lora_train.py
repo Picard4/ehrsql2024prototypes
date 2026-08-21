@@ -109,7 +109,7 @@ def generate_query(model, role_string, question):
     return prediction
 
 def calculate_accuracy(model, role_string, dataset):
-    pass
+    print(dataset)
 
 baseline_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable."""
 schema_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable. The following is the database schema:
@@ -403,7 +403,9 @@ def train_and_eval_model(model, role_string, model_nickname, train_args=None, ev
         print(f"\nEvaluating {model_nickname} on the validation set...")
 
         # Accuracy10
-
+        with open(os.path.join(data_dir, data_file_name)) as f:
+            valid_data = json.load(f)  # We need to know the ids for the validation data, so I need to load it from a separate file.
+        accuracy = calculate_accuracy(model, role_string, valid_data)
 
         # Validation loss
         eval_results = eval_trainer.evaluate()
