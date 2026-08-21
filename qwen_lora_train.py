@@ -419,6 +419,8 @@ max_length=2048
 per_device_eval_batch_size=1
 assistant_only_loss=True
 report_to="none"
+eval_save_strategy="epoch"
+eval_save_steps=50
 
 lora_config = LoraConfig(
     r=8,
@@ -438,11 +440,11 @@ training_args = SFTConfig(
     logging_dir="./logs",
     logging_steps=10,
 
-    eval_strategy="steps",
-    eval_steps=50,
+    eval_strategy=eval_save_strategy,
+    eval_steps=eval_save_steps,
 
-    save_strategy="epoch",
-    save_steps=50,
+    save_strategy=eval_save_strategy,
+    save_steps=eval_save_steps,
 
     load_best_model_at_end=True,
     metric_for_best_model="eval_loss",
