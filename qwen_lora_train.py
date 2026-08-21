@@ -325,8 +325,7 @@ def train_and_eval_model(model, role_string, model_nickname, train_args=None, ev
         print("Evaluating Accuracy...")
         with open(os.path.join(data_dir, data_file_name)) as f:
             valid_data = json.load(f)  # We need to know the ids for the validation data, so I need to load it from a separate file.
-        prediction_file_name = f"{model_nickname}_{prediction_file_name}"
-        accuracy = calculate_score_from_model(model, role_string, valid_data, reference_dir, reference_file_name, prediction_dir, prediction_file_name)
+        accuracy = calculate_score_from_model(model, role_string, valid_data, reference_dir, reference_file_name, prediction_dir, f"{model_nickname}_{prediction_file_name}")
         print(accuracy)
 
         # Validation loss
