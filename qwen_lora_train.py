@@ -309,6 +309,10 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_ar
             model.enable_input_require_grads()
         trainer.train()
 
+        if trainer.args.load_best_model_at_end:
+            print(f"Loading best model from checkpoint: {trainer.state.best_model_checkpoint}")
+            trainer.load_best_model()
+
     if eval_args is not None:
         model.eval()
         eval_trainer = SFTTrainer(
