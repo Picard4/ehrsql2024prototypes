@@ -333,6 +333,12 @@ def train_and_eval_model(model, role_string, model_nickname, train_args=None, ev
         print(eval_results)
 
 
+"""Get Model Nickname"""
+parser = argparse.ArgumentParser()
+parser.add_argument("--model_nickname", type=str, default="default_model")
+args = parser.parse_args()
+model_nickname = args.model_nickname
+
 """Training and LoRA Arguments"""
 # Shared arguments
 fp16=True
@@ -358,7 +364,7 @@ training_args = SFTConfig(
     per_device_eval_batch_size=per_device_eval_batch_size,
     warmup_steps=500,
     weight_decay=0.01,
-    logging_dir="./logs", #TODO
+    logging_dir=f"./logs/{model_nickname}",
     logging_steps=10,
 
     eval_strategy=eval_save_strategy,
@@ -384,11 +390,6 @@ evaluation_args = SFTConfig(
     max_length=max_length,
     remove_unused_columns=False
 )
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--model_nickname", type=str, default="default_model")
-args = parser.parse_args()
-model_nickname = args.model_nickname
 
 # Change model to train depending on nickname
 if model_nickname == "Baseline-Model-1_No-Schema-No-Training":
