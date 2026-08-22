@@ -260,7 +260,7 @@ dataset = load_dataset("json", features=features, data_files={
     val_set_name: processed_val_file
 })
 
-def train_and_eval_model(model, role_string, model_nickname, train_args=None, eval_args=None, lora_args=None):
+def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_args=None, eval_args=None, lora_args=None):
     def format_chat(example):
         inputs = example[input_name]
         labels = example[label_name]
@@ -394,18 +394,24 @@ evaluation_args = SFTConfig(
 # Change model to train depending on nickname
 if model_nickname == "Baseline-Model-1_No-Schema-No-Training":
     train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
         role_string=baseline_role_string,
         model_nickname=model_nickname,
         eval_args=evaluation_args
     )
 elif model_nickname == "Baseline-Model-2_Full-Schema-No-Training":
     train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
         role_string=schema_role_string,
         model_nickname=model_nickname,
         eval_args=evaluation_args
     )
 elif model_nickname == "Model-1_Training-Only-No-Schema":
     train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
         role_string=baseline_role_string,
         model_nickname=model_nickname,
         train_args=training_args,
@@ -413,6 +419,8 @@ elif model_nickname == "Model-1_Training-Only-No-Schema":
     )
 elif model_nickname == "Model-2_Full-Schema-and-Training":
     train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
         role_string=schema_role_string,
         model_nickname=model_nickname,
         train_args=training_args,
