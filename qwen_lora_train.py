@@ -6,6 +6,7 @@ import copy
 import gc
 import os
 import json
+import argparse
 from transformers import AutoModelForCausalLM, AutoTokenizer, EarlyStoppingCallback
 from datasets import load_dataset, Features, Value
 from peft import LoraConfig, get_peft_model
@@ -17,8 +18,8 @@ processed_train_file = "./datasets-processed/train_processed.json"
 processed_val_file = "./datasets-processed/val_processed.json"
 
 # Inference constants
-data_file_name = 'data.json'
-reference_file_name = 'label.json'
+data_file_name = 'data-short.json'
+reference_file_name = 'label-short.json'
 prediction_file_name = 'prediction.json'
 data_dir = os.path.join('./inference/', 'data')
 reference_dir = os.path.join('./inference/', 'ref')
@@ -359,7 +360,7 @@ training_args = SFTConfig(
     per_device_eval_batch_size=per_device_eval_batch_size,
     warmup_steps=500,
     weight_decay=0.01,
-    logging_dir="./logs",
+    logging_dir="./logs", #TODO
     logging_steps=10,
 
     eval_strategy=eval_save_strategy,
