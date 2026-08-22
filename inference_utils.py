@@ -25,7 +25,7 @@ def calculate_score_from_files(reference_path, prediction_path):
     if not os.path.exists(db_path):
         raise Exception('File does not exist: %s' % db_path)
 
-    num_workers = mp.cpu_count()
+    num_workers = min(2, mp.cpu_count())
     if num_workers > 1:
         real_result = execute_all_distributed(real_dict, db_path, tag='real', num_workers=num_workers)
         pred_result = execute_all_distributed(pred_dict, db_path, tag='pred', num_workers=num_workers)
