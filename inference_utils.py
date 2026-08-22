@@ -84,7 +84,7 @@ def calculate_score_from_model(model, role_string, dataset, tokenizer, reference
     results = {}
     reference_path = os.path.join(reference_dir, reference_file_name)
     prediction_path = os.path.join(prediction_dir, prediction_file_name)
-    print(print(f"Predictions will be saved to {prediction_path} and compared to the contents of {reference_path}"))
+    print(f"Predictions will be saved to {prediction_path} and compared to the contents of {reference_path}")
     for example in dataset['data']:
         query = generate_query(model, tokenizer, role_string, example['question'])
         results[example['id']] = query

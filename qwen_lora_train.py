@@ -221,12 +221,10 @@ CREATE TABLE transfers
 """Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-baseline_model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 
 # pad_token setttings to prevent logs from getting flooded
 tokenizer.pad_token = tokenizer.eos_token
-baseline_model.generation_config.pad_token_id = tokenizer.pad_token_id
 model.generation_config.pad_token_id = tokenizer.pad_token_id
 
 # Necessary formatting to make Qwen understand the messages and calculate the loss only on the SQL
@@ -387,51 +385,37 @@ evaluation_args = SFTConfig(
     remove_unused_columns=False
 )
 
-# Baseline 1
-nickname = "Baseline-Model-1_No-Schema-No-Training"
-train_and_eval_model(
-    model=baseline_model,
-    role_string=baseline_role_string,
-    model_nickname=nickname,
-    eval_args=evaluation_args
-)
+parser = argparse.ArgumentParser()
+parser.add_argument("--model_nickname", type=str, default="default_model")
+args = parser.parse_args()
+model_nickname = args.model_nickname
 
-# Baseline 2
-nickname = "Baseline-Model-2_Full-Schema-No-Training"
-train_and_eval_model(
-    model=baseline_model,
-    role_string=schema_role_string,
-    model_nickname=nickname,
-    eval_args=evaluation_args
-)
-del baseline_model
-gc.collect()
-torch.cuda.empty_cache()
-
-# Model 1
-nickname = "Model-1_Training-Only-No-Schema"
-model_1 = copy.deepcopy(model)
-train_and_eval_model(
-    model=model_1,
-    role_string=baseline_role_string,
-    model_nickname=nickname,
-    train_args=training_args,
-    lora_args=lora_config
-)
-del model_1
-gc.collect()
-torch.cuda.empty_cache()
-
-# Model 2
-nickname = "Model-2_Full-Schema-and-Training"
-model_2 = model  # TODO: Deep copy if more models are added in the future
-train_and_eval_model(
-    model=model_2,
-    role_string=schema_role_string,
-    model_nickname=nickname,
-    train_args=training_args,
-    lora_args=lora_config
-)
-del model_2
-gc.collect()
-torch.cuda.empty_cache()
+# Change model to train depending on nickname
+if model_nickname == "Baseline-Model-1_No-Schema-No-Training":
+    train_and_eval_model(
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        eval_args=evaluation_args
+    )
+elif model_nickname == "Baseline-Model-2_Full-Schema-No-Training":
+    train_and_eval_model(
+        role_string=schema_role_string,
+        model_nickname=model_nickname,
+        eval_args=evaluation_args
+    )
+elif model_nickname == "Model-1_Training-Only-No-Schema":
+    train_and_eval_model(
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        train_args=training_args,
+        lora_args=lora_config
+    )
+elif model_nickname == "Model-2_Full-Schema-and-Training":
+    train_and_eval_model(
+        role_string=schema_role_string,
+        model_nickname=model_nickname,
+        train_args=training_args,
+        lora_args=lora_config
+    )
+else:
+    print("Model nickname unknown...")
