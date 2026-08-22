@@ -418,6 +418,7 @@ elif model_nickname == "Model-1_Training-Only-No-Schema":
         role_string=baseline_role_string,
         model_nickname=model_nickname,
         train_args=training_args,
+        eval_args=evaluation_args,
         lora_args=lora_config
     )
 elif model_nickname == "Model-2_Full-Schema-and-Training":
@@ -427,6 +428,7 @@ elif model_nickname == "Model-2_Full-Schema-and-Training":
         role_string=schema_role_string,
         model_nickname=model_nickname,
         train_args=training_args,
+        eval_args=evaluation_args,
         lora_args=lora_config
     )
 else:
