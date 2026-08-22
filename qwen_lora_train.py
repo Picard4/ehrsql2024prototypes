@@ -302,16 +302,16 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_ar
                 )
             ]
         )
-        model.train()
         # This is a built-in PEFT helper that ensures embedding layers 
         # properly retain gradients during gradient checkpointing:
         if hasattr(model, "enable_input_require_grads"):
             model.enable_input_require_grads()
         trainer.train()
 
-        if trainer.args.load_best_model_at_end:
-            print(f"Loading best model from checkpoint: {trainer.state.best_model_checkpoint}")
-            trainer.load_best_model()
+        if trainer.state.best_model_checkpoint is not None:
+            print(f"Best model checkpoint: {trainer.state.best_model_checkpoint}")
+    else:
+        print("Skipping Training. No train_args.")
 
     if eval_args is not None:
         model.eval()
@@ -335,7 +335,8 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_ar
         print("Evaluating Loss...")
         eval_results = eval_trainer.evaluate()
         print(eval_results)
-
+    else:
+        print("Skipping Eval. No eval_args.")
 
 """Get Model Nickname"""
 parser = argparse.ArgumentParser()
@@ -437,3 +438,4 @@ elif model_nickname == "Model-2_Full-Schema-and-Training":
     )
 else:
     print("Model nickname unknown...")
+print("Ending program...")
