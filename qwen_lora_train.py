@@ -18,8 +18,8 @@ processed_train_file = "./datasets-processed/train_processed.json"
 processed_val_file = "./datasets-processed/val_processed.json"
 
 # Inference constants
-data_file_name = 'data-short.json'
-reference_file_name = 'label-short.json'
+data_file_name = 'data.json'
+reference_file_name = 'label.json'
 prediction_file_name = 'prediction.json'
 data_dir = os.path.join('./inference/', 'data')
 reference_dir = os.path.join('./inference/', 'ref')
@@ -369,9 +369,12 @@ training_args = SFTConfig(
 
     eval_strategy=eval_save_strategy,
     eval_steps=eval_save_steps,
-
     save_strategy=eval_save_strategy,
     save_steps=eval_save_steps,
+
+    metric_for_best_model="eval_loss",
+    greater_is_better=False,
+    load_best_model_at_end=True,
 
     learning_rate=1e-4,
     fp16=fp16,
