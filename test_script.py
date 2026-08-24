@@ -23,10 +23,10 @@ retrieval_system = RetrievalSystem(schema_graph)
 
 question = "How is potassium chl 40 meq / 1000 ml d5ns delivered to the body?"
 print(question)
-top_k_tables = retrieval_system.retrieve_top_k_tables(question, schema_graph)
+top_k_tables = retrieval_system.retrieve_top_k_tables(question)
 print(top_k_tables)
 
 question = "What are the standard methods used for ingesting 5% dextrose (excel bag)?"
 print(question)
-top_k_tables = retrieval_system.retrieve_top_k_tables(question, schema_graph)
+top_k_tables = retrieval_system.retrieve_top_k_tables(question)
 print(top_k_tables)

@@ -1,5 +1,5 @@
 baseline_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable."""
-schema_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable. The following is the database schema:
+schema_role_string = baseline_role_string + """ The following is the database schema:
 ```sql
 CREATE TABLE patients 
 (
