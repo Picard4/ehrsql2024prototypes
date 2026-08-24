@@ -38,6 +38,7 @@ def get_retriever(schema_graph):
         "text": "\n".join(lines)
     })
 
+    print("ALL DOCUMENTS")
     print(documents)
     texts = [document["text"] for document in documents]
 
