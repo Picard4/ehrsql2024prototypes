@@ -1,6 +1,6 @@
 from graph_builder import build_mimiciv_knowledge_graph
 from deterministic_knowledge_graph_retrieval import retrieve_schema_prompt
-from rag_knowledge_graph_retrieval import get_retriever
+from rag_knowledge_graph_retrieval import RetrievalSystem
 
 schema_graph = build_mimiciv_knowledge_graph()
 
@@ -19,16 +19,14 @@ def print_graph(schema_graph):
             f"{target}.{data.get('target_column')}"
         )
 
-get_retriever(schema_graph)
+retrieval_system = RetrievalSystem(schema_graph)
 
-"""
 question = "How is potassium chl 40 meq / 1000 ml d5ns delivered to the body?"
 print(question)
-context = retrieve_schema_prompt(question, schema_graph)
-print(context)
+top_k_tables = retrieval_system.retrieve_top_k_tables(question, schema_graph)
+print(top_k_tables)
 
 question = "What are the standard methods used for ingesting 5% dextrose (excel bag)?"
 print(question)
-context = retrieve_schema_prompt(question, schema_graph)
-print(context)
-"""
+top_k_tables = retrieval_system.retrieve_top_k_tables(question, schema_graph)
+print(top_k_tables)
