@@ -80,8 +80,10 @@ class RetrievalSystem:
                     )
                 )
 
-            if relevant_tables.count > most_tables_in_a_query:
-                most_tables_in_a_query = relevant_tables.count
+            most_tables_in_a_query = max(
+                most_tables_in_a_query,
+                len(relevant_tables)
+            )
 
             for irrelevant_table in irrelevant_tables:
                 train_examples.append(
