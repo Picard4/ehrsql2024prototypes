@@ -50,11 +50,9 @@ dataset = load_dataset("json", features=features, data_files={
 })
 retrieval_system.train_embeddings(dataset["train"], input_name, label_name)
 
-"""
 print("Trained Retrieval")
 for question in questions:
     print(question)
     top_k_tables = retrieval_system.retrieve_top_k_tables(question)
     print(top_k_tables)
     print("\n")
-"""

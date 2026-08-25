@@ -1,4 +1,5 @@
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, InputExample, losses
+from torch.utils.data import DataLoader
 
 class RetrievalSystem:
     def __init__(self, schema_graph):
@@ -39,14 +40,77 @@ class RetrievalSystem:
                 "table": table,
                 "text": "\n".join(lines)
             })
-
-        print(len(self.documents))
-        print([doc["table"] for doc in self.documents])
-        for doc in self.documents:
-            print("=" * 50)
-            print(doc["text"])
+    
         texts = [document["text"] for document in self.documents]
 
+        self.document_embeddings = self.embedding_model.encode(
+            texts,
+            normalize_embeddings=True
+        )
+
+    def train_embeddings(self, train_data, input_name, label_name):
+        table_documents = {
+            document["table"]: document["text"]
+            for document in self.documents
+        }
+
+        table_names = list(self.schema_graph.nodes)
+        train_examples = []
+
+        # Determine and record which tables are and are not relevant to each query
+        for example in train_data:
+            relevant_tables = []
+            irrelevant_tables = []
+
+            for table in table_names:
+                if table in example[label_name]:
+                    relevant_tables.append(table)
+                else:
+                    irrelevant_tables.append(table)
+
+            for relevant_table in relevant_tables:
+                train_examples.append(
+                    InputExample(
+                        texts=[
+                            example[input_name],
+                            table_documents[relevant_table]
+                        ],
+                        label=1.0
+                    )
+                )
+            for irrelevant_table in irrelevant_tables:
+                train_examples.append(
+                    InputExample(
+                        texts=[
+                            example[input_name],
+                            table_documents[irrelevant_table]
+                        ],
+                        label=0.0
+                    )
+                )
+
+        train_dataloader = DataLoader(
+            train_examples,
+            shuffle=True,
+            batch_size=16
+        )
+
+        train_loss = losses.CosineSimilarityLoss(
+            self.embedding_model
+        )
+
+        # Fit embedding model
+        self.embedding_model.fit(
+            train_objectives=[
+                (train_dataloader, train_loss)
+            ],
+            epochs=1,
+            warmup_steps=100,
+            show_progress_bar=True
+        )
+
+        # Re-encode the document embeddings
+        texts = [document["text"] for document in self.documents]
         self.document_embeddings = self.embedding_model.encode(
             texts,
             normalize_embeddings=True
@@ -70,15 +134,3 @@ class RetrievalSystem:
             }
             for i in top_indices
         ]
-
-    def train_embeddings(self, train_data, input_name, label_name):
-        table_names = list(self.schema_graph.nodes)
-        print(table_names)
-        for example in train_data:
-            relevant_tables = []
-            irrelevant_tables = []
-            for table in table_names:
-                if table in example[label_name]:
-                    relevant_tables.append(table)
-                else:
-                    irrelevant_tables.append(table)
