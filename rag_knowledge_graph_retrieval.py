@@ -1,6 +1,10 @@
 from sentence_transformers import SentenceTransformer, InputExample, losses
 from torch.utils.data import DataLoader
 
+table_key = "table"
+text_key = "text"
+score_key = "score"
+
 class RetrievalSystem:
     def __init__(self, schema_graph):
         self.schema_graph = schema_graph
@@ -38,10 +42,10 @@ class RetrievalSystem:
 
             self.documents.append({
                 "table": table,
-                "text": "\n".join(lines)
+                text_key: "\n".join(lines)
             })
     
-        texts = [document["text"] for document in self.documents]
+        texts = [document[text_key] for document in self.documents]
 
         self.document_embeddings = self.embedding_model.encode(
             texts,
@@ -49,9 +53,9 @@ class RetrievalSystem:
         )
 
     def train_embeddings(self, train_data, input_name, label_name):
-        most_tables_in_a_query = 0
+        most_tables_in_a_query = 0  # Useful metric to know what top_k to use.
         table_documents = {
-            document["table"]: document["text"]
+            document["table"]: document[text_key]
             for document in self.documents
         }
 
@@ -117,12 +121,12 @@ class RetrievalSystem:
         )
 
         # Re-encode the document embeddings
-        texts = [document["text"] for document in self.documents]
+        texts = [document[text_key] for document in self.documents]
         self.document_embeddings = self.embedding_model.encode(
             texts,
             normalize_embeddings=True
         )
-        print(f"Most tables in a query: {most_tables_in_a_query}")
+        return most_tables_in_a_query
 
     def retrieve_top_k_tables(self, question, top_k=5):
         question_embedding = self.embedding_model.encode(
@@ -136,9 +140,9 @@ class RetrievalSystem:
 
         return [
             {
-                "table": self.documents[i]["table"],
-                "text": self.documents[i]["text"],
-                "score": float(scores[i])
+                table_key: self.documents[i][table_key],
+                text_key: self.documents[i][text_key],
+                score_key: float(scores[i])
             }
             for i in top_indices
         ]

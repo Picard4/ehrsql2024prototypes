@@ -11,6 +11,8 @@ from trl import SFTConfig, SFTTrainer
 from inference_utils import calculate_score_from_model
 from role_strings import baseline_role_string, schema_role_string
 from dataset_constants import input_name, label_name, processed_train_file, processed_val_file, data_dir, data_file_name, prediction_dir, prediction_file_name, reference_dir, reference_file_name
+from graph_builder import build_mimiciv_knowledge_graph
+from rag_knowledge_graph_retrieval import RetrievalSystem, text_key
 
 """Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
@@ -52,7 +54,7 @@ dataset = load_dataset("json", features=features, data_files={
     val_set_name: processed_val_file
 })
 
-def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_args=None, eval_args=None, lora_args=None):
+def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledge_graph_retrieval_system=None, train_args=None, eval_args=None, lora_args=None):
     def format_chat(example):
         inputs = example[input_name]
         labels = example[label_name]
@@ -63,9 +65,24 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_ar
                 input = str(input)
             if isinstance(label, list):
                 label = str(label)
+
+            current_role_string = role_string
+            if knowledge_graph_retrieval_system is not None:
+                top_k_tables = knowledge_graph_retrieval_system.retrieve_top_k_tables(input)
+                schema_context = "\n\n".join(
+                    table[text_key]
+                    for table in top_k_tables
+                )
+                current_role_string = (
+                    role_string
+                    + "\n\n"
+                    + "The following is schema information that might be relevant "
+                    "to the query:\n"
+                    + schema_context
+                )
             
             batch_messages.append([
-                {"role": "system", "content": role_string},
+                {"role": "system", "content": current_role_string},
                 {"role": "user", "content": input},
                 {"role": "assistant", "content": label}
             ])
@@ -129,6 +146,13 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_ar
         print(eval_results)
     else:
         print("Skipping Eval. No eval_args.")
+
+def create_knowledge_graph_retrieval_system(train_dataset=None):
+    schema_graph = build_mimiciv_knowledge_graph()
+    retrieval_system = RetrievalSystem(schema_graph)
+    if train_dataset is not None:
+        retrieval_system.train_embeddings(train_dataset, input_name, label_name)
+    return schema_graph, retrieval_system
 
 """Get Model Nickname"""
 parser = argparse.ArgumentParser()
@@ -208,6 +232,26 @@ elif model_nickname == "Baseline-Model-2_Full-Schema-No-Training":
         model_nickname=model_nickname,
         eval_args=evaluation_args
     )
+elif model_nickname == "Baseline-Model-3_Untrained-Graph-Retriever-No-Model-Training":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system()
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        eval_args=evaluation_args
+    )
+elif model_nickname == "Baseline-Model-4_Trained-Graph-Retriever-No-Model-Training":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        eval_args=evaluation_args
+    )
 elif model_nickname == "Model-1_Training-Only-No-Schema":
     train_and_eval_model(
         model=model,
@@ -224,6 +268,30 @@ elif model_nickname == "Model-2_Full-Schema-and-Training":
         tokenizer=tokenizer,
         role_string=schema_role_string,
         model_nickname=model_nickname,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+elif model_nickname == "Model-3_Untrained-Graph-Retriever-and-Model-Training":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system()
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
         train_args=training_args,
         eval_args=evaluation_args,
         lora_args=lora_config
