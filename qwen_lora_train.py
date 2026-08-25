@@ -1,9 +1,6 @@
 # import sys
 # !{sys.executable} -m pip install "torch<2.5.0" "transformers>=4.42.0" huggingface_hub tiktoken einops transformers_stream_generator datasets accelerate peft ipywidgets trl
 
-import torch
-import copy
-import gc
 import os
 import json
 import argparse
@@ -13,18 +10,7 @@ from peft import LoraConfig, get_peft_model
 from trl import SFTConfig, SFTTrainer
 from inference_utils import calculate_score_from_model
 from role_strings import baseline_role_string, schema_role_string
-
-"""File Constants"""
-processed_train_file = "./datasets-processed/train_processed.json"
-processed_val_file = "./datasets-processed/val_processed.json"
-
-# Inference constants
-data_file_name = 'data.json'
-reference_file_name = 'label.json'
-prediction_file_name = 'prediction.json'
-data_dir = os.path.join('./inference/', 'data')
-reference_dir = os.path.join('./inference/', 'ref')
-prediction_dir = os.path.join('./inference/training', 'res')
+from dataset_constants import input_name, label_name, processed_train_file, processed_val_file, data_dir, data_file_name, prediction_dir, prediction_file_name, reference_dir, reference_file_name
 
 """Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
@@ -55,8 +41,6 @@ tokenizer.chat_template = chat_template
 train_set_name = "train"
 val_set_name = "val"
 test_set_name = "test"
-input_name = "question"
-label_name = "query"
 
 features = Features({
     input_name: Value("string"),

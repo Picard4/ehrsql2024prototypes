@@ -70,3 +70,15 @@ class RetrievalSystem:
             }
             for i in top_indices
         ]
+
+    def train_embeddings(self, train_data, input_name, label_name):
+        table_names = list(self.schema_graph.nodes)
+        print(table_names)
+        for example in train_data:
+            relevant_tables = []
+            irrelevant_tables = []
+            for table in table_names:
+                if table in example[label_name]:
+                    relevant_tables.append(table)
+                else:
+                    irrelevant_tables.append(table)
