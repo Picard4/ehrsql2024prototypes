@@ -8,6 +8,7 @@ import torch
 import multiprocessing as mp
 from scoring.scoring_utils import reliability_score, penalize, execute_all_distributed, execute_all
 from scoring.postprocessing import post_process_sql
+from rag_knowledge_graph_retrieval import text_key
 
 """Score Calculation Function (taken from scoring.py)"""
 def calculate_score_from_files(reference_path, prediction_path):
@@ -47,7 +48,23 @@ def calculate_score_from_files(reference_path, prediction_path):
     }
     return scores_dict
 
-def generate_query(model, tokenizer, role_string, question):
+def get_role_string_with_knowledge_graph_context(knowledge_graph_retrieval_system, role_string, question):
+    top_k_tables = knowledge_graph_retrieval_system.retrieve_top_k_tables(question)
+    schema_context = "\n\n".join(
+        table[text_key]
+        for table in top_k_tables
+    )
+    return (
+        role_string
+        + "\n\n"
+        + "The following is schema information that might be relevant "
+        "to the query:\n"
+        + schema_context
+    )
+
+def generate_query(model, tokenizer, role_string, question, knowledge_graph_retrieval_system=None):
+    if knowledge_graph_retrieval_system is not None:
+        role_string = get_role_string_with_knowledge_graph_context(knowledge_graph_retrieval_system, role_string, question)
     messages = [
         {"role": "system", "content": role_string},
         {"role": "user", "content": question}
@@ -80,13 +97,13 @@ def generate_query(model, tokenizer, role_string, question):
 
     return prediction
 
-def calculate_score_from_model(model, role_string, dataset, tokenizer, reference_dir, reference_file_name, prediction_dir, prediction_file_name):
+def calculate_score_from_model(model, role_string, dataset, tokenizer, reference_dir, reference_file_name, prediction_dir, prediction_file_name, knowledge_graph_retrieval_system=None):
     results = {}
     reference_path = os.path.join(reference_dir, reference_file_name)
     prediction_path = os.path.join(prediction_dir, prediction_file_name)
     print(f"Predictions will be saved to {prediction_path} and compared to the contents of {reference_path}")
     for example in dataset['data']:
-        query = generate_query(model, tokenizer, role_string, example['question'])
+        query = generate_query(model, tokenizer, role_string, example['question'], knowledge_graph_retrieval_system)
         results[example['id']] = query
     os.makedirs(prediction_dir, exist_ok=True)
     with open(prediction_path, 'w') as f:

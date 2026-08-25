@@ -8,11 +8,11 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, EarlyStoppingCallb
 from datasets import load_dataset, Features, Value
 from peft import LoraConfig, get_peft_model
 from trl import SFTConfig, SFTTrainer
-from inference_utils import calculate_score_from_model
+from inference_utils import calculate_score_from_model, get_role_string_with_knowledge_graph_context
 from role_strings import baseline_role_string, schema_role_string
 from dataset_constants import input_name, label_name, processed_train_file, processed_val_file, data_dir, data_file_name, prediction_dir, prediction_file_name, reference_dir, reference_file_name
 from graph_builder import build_mimiciv_knowledge_graph
-from rag_knowledge_graph_retrieval import RetrievalSystem, text_key
+from rag_knowledge_graph_retrieval import RetrievalSystem
 
 """Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
@@ -68,18 +68,7 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledg
 
             current_role_string = role_string
             if knowledge_graph_retrieval_system is not None:
-                top_k_tables = knowledge_graph_retrieval_system.retrieve_top_k_tables(input)
-                schema_context = "\n\n".join(
-                    table[text_key]
-                    for table in top_k_tables
-                )
-                current_role_string = (
-                    role_string
-                    + "\n\n"
-                    + "The following is schema information that might be relevant "
-                    "to the query:\n"
-                    + schema_context
-                )
+                current_role_string = get_role_string_with_knowledge_graph_context(knowledge_graph_retrieval_system, role_string, input)
             
             batch_messages.append([
                 {"role": "system", "content": current_role_string},
@@ -137,7 +126,7 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledg
         print("Evaluating Accuracy...")
         with open(os.path.join(data_dir, data_file_name)) as f:
             valid_data = json.load(f)  # We need to know the ids for the validation data, so I need to load it from a separate file.
-        accuracy = calculate_score_from_model(model, role_string, valid_data, tokenizer, reference_dir, reference_file_name, prediction_dir, f"{model_nickname}_{prediction_file_name}")
+        accuracy = calculate_score_from_model(model, role_string, valid_data, tokenizer, reference_dir, reference_file_name, prediction_dir, f"{model_nickname}_{prediction_file_name}", knowledge_graph_retrieval_system=knowledge_graph_retrieval_system)
         print(accuracy)
 
         # Validation loss
