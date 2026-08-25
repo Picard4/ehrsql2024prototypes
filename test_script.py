@@ -1,7 +1,6 @@
 from datasets import load_dataset, Features, Value
 
 from graph_builder import build_mimiciv_knowledge_graph
-from deterministic_knowledge_graph_retrieval import retrieve_schema_prompt
 from rag_knowledge_graph_retrieval import RetrievalSystem
 from dataset_constants import input_name, label_name, processed_train_file
 

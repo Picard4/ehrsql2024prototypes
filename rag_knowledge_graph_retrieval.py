@@ -49,6 +49,7 @@ class RetrievalSystem:
         )
 
     def train_embeddings(self, train_data, input_name, label_name):
+        most_tables_in_a_query = 0
         table_documents = {
             document["table"]: document["text"]
             for document in self.documents
@@ -78,6 +79,10 @@ class RetrievalSystem:
                         label=1.0
                     )
                 )
+
+            if relevant_tables.count > most_tables_in_a_query:
+                most_tables_in_a_query = relevant_tables.count
+
             for irrelevant_table in irrelevant_tables:
                 train_examples.append(
                     InputExample(
@@ -115,6 +120,7 @@ class RetrievalSystem:
             texts,
             normalize_embeddings=True
         )
+        print(f"Most tables in a query: {most_tables_in_a_query}")
 
     def retrieve_top_k_tables(self, question, top_k=5):
         question_embedding = self.embedding_model.encode(
