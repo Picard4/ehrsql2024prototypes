@@ -1,3 +1,5 @@
+# This code is NOT used. It was just a little experiment I tried before realizing that I need something better to retrieve from a knowledge graph.
+
 TABLE_KEYWORDS = {
     "patients": [
         "patient", "patients", "gender", "date of birth", "birth",
