@@ -22,6 +22,8 @@ def print_graph(schema_graph):
         )
 
 retrieval_system = RetrievalSystem(schema_graph)
+print("DOCUMENTS")
+print(retrieval_system.documents)
 
 questions = [
     "How is potassium chl 40 meq / 1000 ml d5ns delivered to the body?",  # Train

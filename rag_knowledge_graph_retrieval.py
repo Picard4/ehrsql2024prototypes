@@ -53,7 +53,7 @@ class RetrievalSystem:
         )
 
     def train_embeddings(self, train_data, input_name, label_name):
-        most_tables_in_a_query = 0  # Useful metric to know what top_k to use.
+        most_tables_in_a_query = 0  # Useful metric to know what top_k to use. Seems like 5 is a good number.
         table_documents = {
             document["table"]: document[text_key]
             for document in self.documents
