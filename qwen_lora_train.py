@@ -208,6 +208,8 @@ evaluation_args = SFTConfig(
 )
 
 # Change model to train depending on nickname
+
+# First wave of tests: Do we need training, and how should we distribute schema information?
 if model_nickname == "Baseline-Model-1_No-Schema-No-Training":
     train_and_eval_model(
         model=model,
@@ -296,6 +298,111 @@ elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
         eval_args=evaluation_args,
         lora_args=lora_config
     )
+# Second wave of tests: Is it a good idea to use a score to decide how many tables to provide for a query? If so, what's a good score?
+elif model_nickname == "Model-A_Relevancy":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.5,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.55,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+elif model_nickname == "Model-B_Relevancy":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.6,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.65,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+elif model_nickname == "Model-C_Relevancy":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.7,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.75,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+elif model_nickname == "Model-D_Relevancy":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.8,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.85,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )    
 else:
     print("Model nickname unknown...")
 print("Ending program...")
