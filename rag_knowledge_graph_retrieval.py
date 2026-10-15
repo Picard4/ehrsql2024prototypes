@@ -1,3 +1,4 @@
+import numpy as np
 from sentence_transformers import SentenceTransformer, InputExample, losses
 from torch.utils.data import DataLoader
 
@@ -128,16 +129,14 @@ class RetrievalSystem:
         )
         return most_tables_in_a_query
 
-    def retrieve_top_k_tables(self, question, top_k=5):
+    def get_scores(self, question):
         question_embedding = self.embedding_model.encode(
             question,
             normalize_embeddings=True
         )
+        return self.document_embeddings @ question_embedding
 
-        scores = self.document_embeddings @ question_embedding
-
-        top_indices = scores.argsort()[::-1][:top_k]
-
+    def get_chosen_tables(self, scores, top_indices):
         return [
             {
                 table_key: self.documents[i][table_key],
@@ -146,3 +145,18 @@ class RetrievalSystem:
             }
             for i in top_indices
         ]
+
+    def retrieve_top_k_tables(self, question, top_k=5):
+        scores = self.get_scores(question)
+        top_indices = scores.argsort()[::-1][:top_k]
+        return self.get_chosen_tables(scores, top_indices)
+
+    def retrieve_relevant_tables(self, question, relevancy_threshold=0.5):
+        scores = self.get_scores(question)
+        top_indices = np.flatnonzero(scores >= relevancy_threshold)
+        if len(top_indices) == 0:
+            # Get the highest-scoring table if no tables were eligible
+            top_indices = np.array([scores.argmax()])
+        else:
+            top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
+        return self.get_chosen_tables(scores, top_indices)

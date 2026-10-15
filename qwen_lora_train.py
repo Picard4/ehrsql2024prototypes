@@ -8,7 +8,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, EarlyStoppingCallb
 from datasets import load_dataset, Features, Value
 from peft import LoraConfig, get_peft_model
 from trl import SFTConfig, SFTTrainer
-from inference_utils import calculate_score_from_model, get_role_string_with_knowledge_graph_context
+from inference_utils import calculate_score_from_model, get_role_string_with_knowledge_graph_context, TableSelectionFunction
 from role_strings import baseline_role_string, schema_role_string
 from dataset_constants import input_name, label_name, processed_train_file, processed_val_file, data_dir, data_file_name, prediction_dir, prediction_file_name, reference_dir, reference_file_name
 from graph_builder import build_mimiciv_knowledge_graph
@@ -54,7 +54,7 @@ dataset = load_dataset("json", features=features, data_files={
     val_set_name: processed_val_file
 })
 
-def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledge_graph_retrieval_system=None, train_args=None, eval_args=None, lora_args=None):
+def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, train_args=None, eval_args=None, lora_args=None):
     def format_chat(example):
         inputs = example[input_name]
         labels = example[label_name]
@@ -68,7 +68,7 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledg
 
             current_role_string = role_string
             if knowledge_graph_retrieval_system is not None:
-                current_role_string = get_role_string_with_knowledge_graph_context(knowledge_graph_retrieval_system, role_string, input)
+                current_role_string = get_role_string_with_knowledge_graph_context(knowledge_graph_retrieval_system, role_string, input, relevancy_value, table_selection_function=None)
             
             batch_messages.append([
                 {"role": "system", "content": current_role_string},
@@ -126,7 +126,9 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledg
         print("Evaluating Accuracy...")
         with open(os.path.join(data_dir, data_file_name)) as f:
             valid_data = json.load(f)  # We need to know the ids for the validation data, so I need to load it from a separate file.
-        accuracy = calculate_score_from_model(model, role_string, valid_data, tokenizer, reference_dir, reference_file_name, prediction_dir, f"{model_nickname}_{prediction_file_name}", knowledge_graph_retrieval_system=knowledge_graph_retrieval_system)
+        accuracy = calculate_score_from_model(model, role_string, valid_data, tokenizer, 
+                                              reference_dir, reference_file_name, prediction_dir, f"{model_nickname}_{prediction_file_name}", 
+                                              knowledge_graph_retrieval_system=knowledge_graph_retrieval_system, relevancy_value=relevancy_value, table_selection_function=table_selection_function)
         print(accuracy)
 
         # Validation loss
@@ -151,6 +153,7 @@ model_nickname = args.model_nickname
 
 """Training and LoRA Arguments"""
 # Shared arguments
+top_k_tables=5
 fp16=True
 max_length=2048
 per_device_eval_batch_size=1
@@ -229,6 +232,8 @@ elif model_nickname == "Baseline-Model-3_Untrained-Graph-Retriever-No-Model-Trai
         role_string=baseline_role_string,
         model_nickname=model_nickname,
         knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=top_k_tables,
+        table_selection_function=TableSelectionFunction.retrieve_top_k_tables,
         eval_args=evaluation_args
     )
 elif model_nickname == "Baseline-Model-4_Trained-Graph-Retriever-No-Model-Training":
@@ -239,6 +244,8 @@ elif model_nickname == "Baseline-Model-4_Trained-Graph-Retriever-No-Model-Traini
         role_string=baseline_role_string,
         model_nickname=model_nickname,
         knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=top_k_tables,
+        table_selection_function=TableSelectionFunction.retrieve_top_k_tables,
         eval_args=evaluation_args
     )
 elif model_nickname == "Model-1_Training-Only-No-Schema":
@@ -269,6 +276,8 @@ elif model_nickname == "Model-3_Untrained-Graph-Retriever-and-Model-Training":
         role_string=baseline_role_string,
         model_nickname=model_nickname,
         knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=top_k_tables,
+        table_selection_function=TableSelectionFunction.retrieve_top_k_tables,
         train_args=training_args,
         eval_args=evaluation_args,
         lora_args=lora_config
@@ -281,6 +290,8 @@ elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
         role_string=baseline_role_string,
         model_nickname=model_nickname,
         knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=top_k_tables,
+        table_selection_function=TableSelectionFunction.retrieve_top_k_tables,
         train_args=training_args,
         eval_args=evaluation_args,
         lora_args=lora_config
