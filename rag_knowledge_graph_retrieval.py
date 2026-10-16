@@ -159,4 +159,5 @@ class RetrievalSystem:
             top_indices = np.array([scores.argmax()])
         else:
             top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
+            print(top_indices)
         return self.get_chosen_tables(scores, top_indices)
