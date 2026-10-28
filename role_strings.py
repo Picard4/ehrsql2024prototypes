@@ -1,7 +1,7 @@
 baseline_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question or return \"null\" if it is unanswerable."""
-schema_role_string = baseline_role_string + """ The following is the database schema:
+schema_role_string_part = """ The following is the database schema:
 ```sql
-CREATE TABLE patients 
+CREATE TABLE patients
 (
     row_id INT NOT NULL PRIMARY KEY,
     subject_id INT NOT NULL UNIQUE,
@@ -31,19 +31,19 @@ CREATE TABLE d_icd_diagnoses
     icd_code VARCHAR(10) NOT NULL UNIQUE,
     long_title VARCHAR(255) NOT NULL
 );
-CREATE TABLE d_icd_procedures 
+CREATE TABLE d_icd_procedures
 (
     row_id INT NOT NULL PRIMARY KEY,
     icd_code VARCHAR(10) NOT NULL UNIQUE,
     long_title VARCHAR(255) NOT NULL
 );
-CREATE TABLE d_labitems 
+CREATE TABLE d_labitems
 (
     row_id INT NOT NULL PRIMARY KEY,
     itemid INT NOT NULL UNIQUE,
     label VARCHAR(200)
 );
-CREATE TABLE d_items 
+CREATE TABLE d_items
 (
     row_id INT NOT NULL PRIMARY KEY,
     itemid INT NOT NULL UNIQUE,
@@ -189,3 +189,16 @@ CREATE TABLE transfers
     FOREIGN KEY(hadm_id) REFERENCES admissions(hadm_id)
 );
 ```"""
+schema_role_string = baseline_role_string + schema_role_string_part
+
+answerability_role_string = """
+Determine whether the question can be answered using the
+available database and its schema.
+
+Output exactly one of these labels:
+- "null": the question is unanswerable.
+- "answerable": the question can be answered.
+
+Do not output an explanation or an SQL query.
+"""
+pipeline_sql_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question."""

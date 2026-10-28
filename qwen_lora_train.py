@@ -14,6 +14,9 @@ from dataset_constants import input_name, label_name, processed_train_file, proc
 from graph_builder import build_mimiciv_knowledge_graph
 from rag_knowledge_graph_retrieval import RetrievalSystem
 
+"""Constants"""
+UNANSWERABLE_STRING = "null"
+
 """Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
@@ -54,32 +57,33 @@ dataset = load_dataset("json", features=features, data_files={
     val_set_name: processed_val_file
 })
 
-def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, train_args=None, eval_args=None, lora_args=None):
-    def format_chat(example):
-        inputs = example[input_name]
-        labels = example[label_name]
-
+def format_chat_dataset(split, role_string, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None):
+    def format_chat(batch):
+        inputs = batch[input_name]
+        labels = batch[label_name]
+    
         batch_messages = []
         for input, label in zip(inputs, labels):
             if isinstance(input, list):
                 input = str(input)
             if isinstance(label, list):
                 label = str(label)
-
+    
             current_role_string = role_string
             if knowledge_graph_retrieval_system is not None:
-                current_role_string = get_role_string_with_knowledge_graph_context(knowledge_graph_retrieval_system, role_string, input, relevancy_value, table_selection_function=None)
-            
+                current_role_string = get_role_string_with_knowledge_graph_context(knowledge_graph_retrieval_system, role_string, input, relevancy_value, table_selection_function)
+    
             batch_messages.append([
                 {"role": "system", "content": current_role_string},
                 {"role": "user", "content": input},
                 {"role": "assistant", "content": label}
             ])
-
         return {"messages": batch_messages}
-    
-    train_dataset = dataset[train_set_name].map(format_chat, batched=True, remove_columns=dataset[train_set_name].column_names)
-    val_dataset = dataset[val_set_name].map(format_chat, batched=True, remove_columns=dataset[val_set_name].column_names)
+    return split.map(format_chat, batched=True, remove_columns=split.column_names)
+
+def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, train_args=None, eval_args=None, lora_args=None):
+    train_dataset = format_chat_dataset(dataset[train_set_name], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
+    val_dataset = format_chat_dataset(dataset[val_set_name], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
     
     if lora_args is not None:
         model = get_peft_model(model, lora_args)
