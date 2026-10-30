@@ -16,6 +16,9 @@ from rag_knowledge_graph_retrieval import RetrievalSystem
 
 """Constants"""
 UNANSWERABLE_STRING = "null"
+TRAIN_SET_NAME = "train"
+VAL_SET_NAME = "val"
+TEST_SET_NAME = "test"
 
 """Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
@@ -43,18 +46,14 @@ chat_template = chat_template.replace(tokenizer_jinja_old, tokenizer_jinja_new)
 tokenizer.chat_template = chat_template
 
 """Dataset Loading"""
-train_set_name = "train"
-val_set_name = "val"
-test_set_name = "test"
-
 features = Features({
     input_name: Value("string"),
     label_name: Value("string")
 })
 
 dataset = load_dataset("json", features=features, data_files={
-    train_set_name: processed_train_file,
-    val_set_name: processed_val_file
+    TRAIN_SET_NAME: processed_train_file,
+    VAL_SET_NAME: processed_val_file
 })
 
 def format_chat_dataset(split, role_string, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None):
@@ -82,8 +81,8 @@ def format_chat_dataset(split, role_string, knowledge_graph_retrieval_system=Non
     return split.map(format_chat, batched=True, remove_columns=split.column_names)
 
 def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, train_args=None, eval_args=None, lora_args=None):
-    train_dataset = format_chat_dataset(dataset[train_set_name], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
-    val_dataset = format_chat_dataset(dataset[val_set_name], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
+    train_dataset = format_chat_dataset(dataset[TRAIN_SET_NAME], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
+    val_dataset = format_chat_dataset(dataset[VAL_SET_NAME], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
     
     if lora_args is not None:
         model = get_peft_model(model, lora_args)
@@ -243,7 +242,7 @@ elif model_nickname == "Baseline-Model-3_Untrained-Graph-Retriever-No-Model-Trai
         eval_args=evaluation_args
     )
 elif model_nickname == "Baseline-Model-4_Trained-Graph-Retriever-No-Model-Training":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     train_and_eval_model(
         model=model,
         tokenizer=tokenizer,
@@ -289,7 +288,7 @@ elif model_nickname == "Model-3_Untrained-Graph-Retriever-and-Model-Training":
         lora_args=lora_config
     )
 elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     train_and_eval_model(
         model=model,
         tokenizer=tokenizer,
@@ -304,7 +303,7 @@ elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
     )
 # Second wave of tests: Is it a good idea to use a score to decide how many tables to provide for a query? If so, what's a good score?
 elif model_nickname == "Model-A_Relevancy":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     train_and_eval_model(
         model=model,
         tokenizer=tokenizer,
@@ -330,7 +329,7 @@ elif model_nickname == "Model-A_Relevancy":
         lora_args=lora_config
     )
 elif model_nickname == "Model-B_Relevancy":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     train_and_eval_model(
         model=model,
         tokenizer=tokenizer,
@@ -356,7 +355,7 @@ elif model_nickname == "Model-B_Relevancy":
         lora_args=lora_config
     )
 elif model_nickname == "Model-C_Relevancy":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     train_and_eval_model(
         model=model,
         tokenizer=tokenizer,
@@ -382,7 +381,7 @@ elif model_nickname == "Model-C_Relevancy":
         lora_args=lora_config
     )
 elif model_nickname == "Model-D_Relevancy":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[train_set_name])
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     train_and_eval_model(
         model=model,
         tokenizer=tokenizer,
