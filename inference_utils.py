@@ -115,6 +115,13 @@ def calculate_score_from_model(models, role_strings, dataset, tokenizer,
     reference_path = os.path.join(reference_dir, reference_file_name)
     prediction_path = os.path.join(prediction_dir, prediction_file_name)
     print(f"Predictions will be saved to {prediction_path} and compared to the contents of {reference_path}")
+
+    # This is probably unnecessary, but just to be safe...
+    for model in models:
+        model.eval()
+
+    # Behaviour changes depending on whether we have just one model or a pipeline of them.
+    # The current code assumes that if 2 models are present, the first determines if the question is answerable, and the second answers the question.
     if (len(models) == 1):
         for example in dataset['data']:
             query = generate_model_prediction(models[0], tokenizer, role_strings[0], example['question'], knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
