@@ -223,9 +223,8 @@ evaluation_args = SFTConfig(
     remove_unused_columns=False
 )
 
-def pipeline_train_and_eval(model, model_nickname, relevancy_value):
+def pipeline_train_and_eval(model, model_nickname, relevancy_value, table_selection_function):
     knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
-    table_selection_function = TableSelectionFunction.retrieve_relevant_tables
     first_model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
     second_model = model
 
@@ -359,13 +358,25 @@ elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
 # Second wave of tests: Is it a good idea to use a score to decide how many tables to provide for a query? If so, what's a good score?
 # Also, how does the model perform with a pipeline compared to having one model handle everything?
 elif model_nickname == "Pipeline-Low_Relevancy":
-    pipeline_train_and_eval(model, "0.5_relevancy_threshold", 0.5)
+    #pipeline_train_and_eval(model, "0.5_relevancy_threshold", 0.5, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(model, "3_tables", 3, TableSelectionFunction.retrieve_top_k_tables)
 elif model_nickname == "Pipeline-Medium_Relevancy":
-    pipeline_train_and_eval(model, "0.6_relevancy_threshold", 0.6)
+    #pipeline_train_and_eval(model, "0.6_relevancy_threshold", 0.6, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(model, "4_tables", 4, TableSelectionFunction.retrieve_top_k_tables)
 elif model_nickname == "Pipeline-High_Relevancy":
-    pipeline_train_and_eval(model, "0.7_relevancy_threshold", 0.7)
+    #pipeline_train_and_eval(model, "0.7_relevancy_threshold", 0.7, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(model, "5_tables", 5, TableSelectionFunction.retrieve_top_k_tables)
 elif model_nickname == "Pipeline-Very-High_Relevancy":
-    pipeline_train_and_eval(model, "0.8_relevancy_threshold", 0.8)
+    #pipeline_train_and_eval(model, "0.8_relevancy_threshold", 0.8, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(model, "6_tables", 6, TableSelectionFunction.retrieve_top_k_tables)
+elif model_nickname == "Pipeline-Low_Tables":
+    pipeline_train_and_eval(model, "3_tables", 3, TableSelectionFunction.retrieve_top_k_tables)
+elif model_nickname == "Pipeline-Medium_Tables":
+    pipeline_train_and_eval(model, "4_tables", 4, TableSelectionFunction.retrieve_top_k_tables)
+elif model_nickname == "Pipeline-High_Tables":
+    pipeline_train_and_eval(model, "5_tables", 5, TableSelectionFunction.retrieve_top_k_tables)
+elif model_nickname == "Pipeline-Very-High_Tables":
+    pipeline_train_and_eval(model, "6_tables", 6, TableSelectionFunction.retrieve_top_k_tables)
 else:
     print("Model nickname unknown...")
 print("Ending program...")
