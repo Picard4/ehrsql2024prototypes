@@ -204,3 +204,6 @@ Output exactly one of these labels:
 Do not output an explanation or an SQL query.
 """
 pipeline_sql_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question."""
+
+def is_role_string_for_answerability_task(role_string):
+    return role_string == answerability_role_string

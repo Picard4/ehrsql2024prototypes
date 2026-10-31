@@ -9,7 +9,7 @@ from datasets import load_dataset, Features, Value
 from peft import LoraConfig, get_peft_model
 from trl import SFTConfig, SFTTrainer
 from inference_utils import calculate_score_from_model, get_role_string_with_knowledge_graph_context, TableSelectionFunction
-from role_strings import baseline_role_string, schema_role_string, answerability_role_string, pipeline_sql_role_string, UNANSWERABLE_STRING
+from role_strings import ANSWERABLE_STRING, baseline_role_string, is_role_string_for_answerability_task, schema_role_string, answerability_role_string, pipeline_sql_role_string, UNANSWERABLE_STRING
 from dataset_constants import input_name, label_name, processed_train_file, processed_val_file, data_dir, data_file_name, prediction_dir, prediction_file_name, reference_dir, reference_file_name
 from graph_builder import build_mimiciv_knowledge_graph
 from rag_knowledge_graph_retrieval import RetrievalSystem
@@ -56,6 +56,7 @@ dataset = load_dataset("json", features=features, data_files={
 })
 
 def format_chat_dataset(split, role_string, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, exclude_unanswerable_questions=False):
+    answerability_task = is_role_string_for_answerability_task(role_string)
     def format_chat(batch):
         inputs = batch[input_name]
         labels = batch[label_name]
@@ -69,6 +70,8 @@ def format_chat_dataset(split, role_string, knowledge_graph_retrieval_system=Non
 
             if (label == UNANSWERABLE_STRING and exclude_unanswerable_questions):
                 continue
+            elif (label != UNANSWERABLE_STRING and answerability_task):
+                label = ANSWERABLE_STRING
     
             current_role_string = role_string
             if knowledge_graph_retrieval_system is not None:
@@ -149,6 +152,7 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_da
         print(eval_results)
     else:
         print("Skipping Eval. No eval_args.")
+    return model
 
 def create_knowledge_graph_retrieval_system(train_dataset=None):
     schema_graph = build_mimiciv_knowledge_graph()
@@ -156,17 +160,6 @@ def create_knowledge_graph_retrieval_system(train_dataset=None):
     if train_dataset is not None:
         retrieval_system.train_embeddings(train_dataset, input_name, label_name)
     return retrieval_system
-
-def inference_pipeline_evaluation(first_model, second_model, model_nickname, knowledge_graph_retrieval_system, relevancy_value, table_selection_function):
-    print("Evaluating Accuracy...")
-    first_model.eval()
-    second_model.eval()
-    valid_data = load_accuracy_valid_data()
-    accuracy = calculate_score_from_model([first_model, second_model], [answerability_role_string, pipeline_sql_role_string], valid_data, tokenizer, 
-                                        reference_dir, reference_file_name, prediction_dir, f"{model_nickname}_{prediction_file_name}", 
-                                        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system, relevancy_value=relevancy_value, table_selection_function=table_selection_function)
-    print("Accuracy Results:")
-    print(accuracy)
 
 """Get Model Nickname"""
 parser = argparse.ArgumentParser()
@@ -231,10 +224,12 @@ evaluation_args = SFTConfig(
 )
 
 def pipeline_train_and_eval(model, model_nickname, relevancy_value):
+    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    table_selection_function = TableSelectionFunction.retrieve_relevant_tables
     first_model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
     second_model = model
 
-    train_and_eval_model(
+    first_model = train_and_eval_model(
         model=first_model,
         tokenizer=tokenizer,
         role_string=answerability_role_string,
@@ -242,12 +237,12 @@ def pipeline_train_and_eval(model, model_nickname, relevancy_value):
         exclude_unanswerable_questions=False,
         knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
         relevancy_value=relevancy_value,
-        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        table_selection_function=table_selection_function,
         train_args=training_args,
         eval_args=None,
         lora_args=lora_config
     )
-    train_and_eval_model(
+    second_model = train_and_eval_model(
         model=second_model,
         tokenizer=tokenizer,
         role_string=pipeline_sql_role_string,
@@ -255,13 +250,21 @@ def pipeline_train_and_eval(model, model_nickname, relevancy_value):
         exclude_unanswerable_questions=True,
         knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
         relevancy_value=relevancy_value,
-        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        table_selection_function=table_selection_function,
         train_args=training_args,
         eval_args=None,
         lora_args=lora_config
     )
 
-    inference_pipeline_evaluation(first_model, second_model, evaluation_args)
+    print("Evaluating Accuracy...")
+    first_model.eval()
+    second_model.eval()
+    valid_data = load_accuracy_valid_data()
+    accuracy = calculate_score_from_model([first_model, second_model], [answerability_role_string, pipeline_sql_role_string], valid_data, tokenizer, 
+                                        reference_dir, reference_file_name, prediction_dir, f"{model_nickname}_{prediction_file_name}", 
+                                        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system, relevancy_value=relevancy_value, table_selection_function=table_selection_function)
+    print("Accuracy Results:")
+    print(accuracy)
 
 # Change model to train depending on nickname
 # First wave of tests: Do we need training, and how should we distribute schema information?
@@ -356,16 +359,12 @@ elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
 # Second wave of tests: Is it a good idea to use a score to decide how many tables to provide for a query? If so, what's a good score?
 # Also, how does the model perform with a pipeline compared to having one model handle everything?
 elif model_nickname == "Pipeline-Low_Relevancy":
-    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     pipeline_train_and_eval(model, "0.5_relevancy_threshold", 0.5)
 elif model_nickname == "Pipeline-Medium_Relevancy":
-    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     pipeline_train_and_eval(model, "0.6_relevancy_threshold", 0.6)
 elif model_nickname == "Pipeline-High_Relevancy":
-    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     pipeline_train_and_eval(model, "0.7_relevancy_threshold", 0.7)
 elif model_nickname == "Pipeline-Very-High_Relevancy":
-    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     pipeline_train_and_eval(model, "0.8_relevancy_threshold", 0.8)
 else:
     print("Model nickname unknown...")
