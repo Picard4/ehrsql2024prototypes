@@ -169,7 +169,7 @@ model_nickname = args.model_nickname
 
 """Training and LoRA Arguments"""
 # Shared arguments
-top_k_tables=5
+top_k_tables_for_first_wave_models=5
 fp16=True
 max_length=2048
 per_device_eval_batch_size=1
@@ -222,6 +222,21 @@ evaluation_args = SFTConfig(
     max_length=max_length,
     remove_unused_columns=False
 )
+
+def single_model_train_and_eval(model, model_nickname, relevancy_value, table_selection_function):
+    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname=model_nickname,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=relevancy_value,
+        table_selection_function=table_selection_function,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
 
 def pipeline_train_and_eval(model, model_nickname, relevancy_value, table_selection_function):
     knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
@@ -291,7 +306,7 @@ elif model_nickname == "Baseline-Model-3_Untrained-Graph-Retriever-No-Model-Trai
         role_string=baseline_role_string,
         model_nickname=model_nickname,
         knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=top_k_tables,
+        relevancy_value=top_k_tables_for_first_wave_models,
         table_selection_function=TableSelectionFunction.retrieve_top_k_tables,
         eval_args=evaluation_args
     )
@@ -303,7 +318,7 @@ elif model_nickname == "Baseline-Model-4_Trained-Graph-Retriever-No-Model-Traini
         role_string=baseline_role_string,
         model_nickname=model_nickname,
         knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=top_k_tables,
+        relevancy_value=top_k_tables_for_first_wave_models,
         table_selection_function=TableSelectionFunction.retrieve_top_k_tables,
         eval_args=evaluation_args
     )
@@ -335,7 +350,7 @@ elif model_nickname == "Model-3_Untrained-Graph-Retriever-and-Model-Training":
         role_string=baseline_role_string,
         model_nickname=model_nickname,
         knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=top_k_tables,
+        relevancy_value=top_k_tables_for_first_wave_models,
         table_selection_function=TableSelectionFunction.retrieve_top_k_tables,
         train_args=training_args,
         eval_args=evaluation_args,
@@ -349,7 +364,7 @@ elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
         role_string=baseline_role_string,
         model_nickname=model_nickname,
         knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=top_k_tables,
+        relevancy_value=top_k_tables_for_first_wave_models,
         table_selection_function=TableSelectionFunction.retrieve_top_k_tables,
         train_args=training_args,
         eval_args=evaluation_args,
@@ -357,26 +372,42 @@ elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
     )
 # Second wave of tests: Is it a good idea to use a score to decide how many tables to provide for a query? If so, what's a good score?
 # Also, how does the model perform with a pipeline compared to having one model handle everything?
-elif model_nickname == "Pipeline-Low_Relevancy":
-    #pipeline_train_and_eval(model, "0.5_relevancy_threshold", 0.5, TableSelectionFunction.retrieve_relevant_tables)
-    pipeline_train_and_eval(model, "3_tables", 3, TableSelectionFunction.retrieve_top_k_tables)
-elif model_nickname == "Pipeline-Medium_Relevancy":
-    #pipeline_train_and_eval(model, "0.6_relevancy_threshold", 0.6, TableSelectionFunction.retrieve_relevant_tables)
-    pipeline_train_and_eval(model, "4_tables", 4, TableSelectionFunction.retrieve_top_k_tables)
-elif model_nickname == "Pipeline-High_Relevancy":
-    #pipeline_train_and_eval(model, "0.7_relevancy_threshold", 0.7, TableSelectionFunction.retrieve_relevant_tables)
-    pipeline_train_and_eval(model, "5_tables", 5, TableSelectionFunction.retrieve_top_k_tables)
-elif model_nickname == "Pipeline-Very-High_Relevancy":
-    #pipeline_train_and_eval(model, "0.8_relevancy_threshold", 0.8, TableSelectionFunction.retrieve_relevant_tables)
-    pipeline_train_and_eval(model, "6_tables", 6, TableSelectionFunction.retrieve_top_k_tables)
-elif model_nickname == "Pipeline-Low_Tables":
-    pipeline_train_and_eval(model, "3_tables", 3, TableSelectionFunction.retrieve_top_k_tables)
-elif model_nickname == "Pipeline-Medium_Tables":
-    pipeline_train_and_eval(model, "4_tables", 4, TableSelectionFunction.retrieve_top_k_tables)
-elif model_nickname == "Pipeline-High_Tables":
-    pipeline_train_and_eval(model, "5_tables", 5, TableSelectionFunction.retrieve_top_k_tables)
-elif model_nickname == "Pipeline-Very-High_Tables":
-    pipeline_train_and_eval(model, "6_tables", 6, TableSelectionFunction.retrieve_top_k_tables)
+elif model_nickname == "Pipeline-0.5_Relevancy":
+    pipeline_train_and_eval(model, "Pipeline-0.5_Relevancy", 0.5, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Pipeline-0.6_Relevancy":
+    pipeline_train_and_eval(model, "Pipeline-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Pipeline-0.7_Relevancy":
+    pipeline_train_and_eval(model, "Pipeline-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Pipeline-0.8_Relevancy":
+    pipeline_train_and_eval(model, "Pipeline-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables)
+
+elif model_nickname == "Pipeline-3_Tables":
+    pipeline_train_and_eval(model, "Pipeline-3_Tables", 3, TableSelectionFunction.retrieve_top_k_tables)
+elif model_nickname == "Pipeline-4_Tables":
+    pipeline_train_and_eval(model, "Pipeline-4_Tables", 4, TableSelectionFunction.retrieve_top_k_tables)
+elif model_nickname == "Pipeline-5_Tables":
+    pipeline_train_and_eval(model, "Pipeline-5_Tables", 5, TableSelectionFunction.retrieve_top_k_tables)
+elif model_nickname == "Pipeline-6_Tables":
+    pipeline_train_and_eval(model, "Pipeline-6_Tables", 6, TableSelectionFunction.retrieve_top_k_tables)
+
+elif model_nickname == "Single-Model-0.5_Relevancy":
+    single_model_train_and_eval(model, "Single-Model-0.5_Relevancy", 0.5, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Single-Model-0.6_Relevancy":
+    single_model_train_and_eval(model, "Single-Model-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Single-Model-0.7_Relevancy":
+    single_model_train_and_eval(model, "Single-Model-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Single-Model-0.8_Relevancy":
+    single_model_train_and_eval(model, "Single-Model-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables)
+
+elif model_nickname == "Single-Model-3_Tables":
+    single_model_train_and_eval(model, "Single-Model-3_Tables", 3, TableSelectionFunction.retrieve_top_k_tables)
+elif model_nickname == "Single-Model-4_Tables":
+    single_model_train_and_eval(model, "Single-Model-4_Tables", 4, TableSelectionFunction.retrieve_top_k_tables)
+elif model_nickname == "Single-Model-5_Tables":
+    single_model_train_and_eval(model, "Single-Model-5_Tables", 5, TableSelectionFunction.retrieve_top_k_tables)
+elif model_nickname == "Single-Model-6_Tables":
+    single_model_train_and_eval(model, "Single-Model-6_Tables", 6, TableSelectionFunction.retrieve_top_k_tables)
+
 else:
     print("Model nickname unknown...")
 print("Ending program...")
