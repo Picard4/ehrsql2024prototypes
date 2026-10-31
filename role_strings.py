@@ -191,13 +191,15 @@ CREATE TABLE transfers
 ```"""
 schema_role_string = baseline_role_string + schema_role_string_part
 
-answerability_role_string = """
+UNANSWERABLE_STRING = "null"
+ANSWERABLE_STRING = "answerable"
+answerability_role_string = f"""
 Determine whether the question can be answered using the
-available database and its schema.
+available database and the provided parts of the schema.
 
 Output exactly one of these labels:
-- "null": the question is unanswerable.
-- "answerable": the question can be answered.
+- "{UNANSWERABLE_STRING}": the question is unanswerable.
+- "{ANSWERABLE_STRING}": the question can be answered.
 
 Do not output an explanation or an SQL query.
 """

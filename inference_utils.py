@@ -10,6 +10,7 @@ from enum import Enum
 from scoring.scoring_utils import reliability_score, penalize, execute_all_distributed, execute_all
 from scoring.postprocessing import post_process_sql
 from rag_knowledge_graph_retrieval import text_key
+from role_strings import UNANSWERABLE_STRING, ANSWERABLE_STRING
 
 class TableSelectionFunction(Enum):
     retrieve_top_k_tables = 1
@@ -70,7 +71,7 @@ def get_role_string_with_knowledge_graph_context(knowledge_graph_retrieval_syste
         + schema_context
     )
 
-def generate_query(model, tokenizer, role_string, question, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None):
+def generate_model_prediction(model, tokenizer, role_string, question, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None):
     if knowledge_graph_retrieval_system is not None:
         role_string = get_role_string_with_knowledge_graph_context(knowledge_graph_retrieval_system, role_string, question, relevancy_value, table_selection_function)
     messages = [
@@ -92,7 +93,7 @@ def generate_query(model, tokenizer, role_string, question, knowledge_graph_retr
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=256,
+            max_new_tokens=512,
             do_sample=False
         )
 
@@ -105,16 +106,28 @@ def generate_query(model, tokenizer, role_string, question, knowledge_graph_retr
 
     return prediction
 
-def calculate_score_from_model(model, role_string, dataset, tokenizer, 
+def calculate_score_from_model(models, role_strings, dataset, tokenizer, 
                                reference_dir, reference_file_name, prediction_dir, prediction_file_name, 
                                knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None):
     results = {}
     reference_path = os.path.join(reference_dir, reference_file_name)
     prediction_path = os.path.join(prediction_dir, prediction_file_name)
     print(f"Predictions will be saved to {prediction_path} and compared to the contents of {reference_path}")
-    for example in dataset['data']:
-        query = generate_query(model, tokenizer, role_string, example['question'], knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
-        results[example['id']] = query
+    if (len(models) == 1):
+        for example in dataset['data']:
+            query = generate_model_prediction(models[0], tokenizer, role_strings[0], example['question'], knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
+            results[example['id']] = query
+    elif (len(models) == 2):
+        for example in dataset['data']:
+            answerability_prediction = generate_model_prediction(models[0], tokenizer, role_strings[0], example['question'], knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
+            if answerability_prediction == UNANSWERABLE_STRING:
+                results[example['id']] = answerability_prediction
+            elif answerability_prediction == ANSWERABLE_STRING:
+                query = generate_model_prediction(models[1], tokenizer, role_strings[1], example['question'], knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
+                results[example['id']] = query
+            else:
+                print(f"Warning: Answerability Prediction was \"{answerability_prediction}\" for the question with ID {example['id']}")
+                results[example['id']] = answerability_prediction
     os.makedirs(prediction_dir, exist_ok=True)
     with open(prediction_path, 'w') as f:
         json.dump(results, f, indent=4)

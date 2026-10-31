@@ -9,13 +9,12 @@ from datasets import load_dataset, Features, Value
 from peft import LoraConfig, get_peft_model
 from trl import SFTConfig, SFTTrainer
 from inference_utils import calculate_score_from_model, get_role_string_with_knowledge_graph_context, TableSelectionFunction
-from role_strings import baseline_role_string, schema_role_string
+from role_strings import baseline_role_string, schema_role_string, answerability_role_string, pipeline_sql_role_string, UNANSWERABLE_STRING
 from dataset_constants import input_name, label_name, processed_train_file, processed_val_file, data_dir, data_file_name, prediction_dir, prediction_file_name, reference_dir, reference_file_name
 from graph_builder import build_mimiciv_knowledge_graph
 from rag_knowledge_graph_retrieval import RetrievalSystem
 
 """Constants"""
-UNANSWERABLE_STRING = "null"
 TRAIN_SET_NAME = "train"
 VAL_SET_NAME = "val"
 TEST_SET_NAME = "test"
@@ -25,7 +24,7 @@ model_name = "Qwen/Qwen2.5-1.5B"
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 
-# pad_token setttings to prevent logs from getting flooded
+# pad_token settings to prevent logs from getting flooded
 tokenizer.pad_token = tokenizer.eos_token
 model.generation_config.pad_token_id = tokenizer.pad_token_id
 
@@ -56,7 +55,7 @@ dataset = load_dataset("json", features=features, data_files={
     VAL_SET_NAME: processed_val_file
 })
 
-def format_chat_dataset(split, role_string, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None):
+def format_chat_dataset(split, role_string, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, exclude_unanswerable_questions=False):
     def format_chat(batch):
         inputs = batch[input_name]
         labels = batch[label_name]
@@ -67,6 +66,9 @@ def format_chat_dataset(split, role_string, knowledge_graph_retrieval_system=Non
                 input = str(input)
             if isinstance(label, list):
                 label = str(label)
+
+            if (label == UNANSWERABLE_STRING and exclude_unanswerable_questions):
+                continue
     
             current_role_string = role_string
             if knowledge_graph_retrieval_system is not None:
@@ -80,9 +82,16 @@ def format_chat_dataset(split, role_string, knowledge_graph_retrieval_system=Non
         return {"messages": batch_messages}
     return split.map(format_chat, batched=True, remove_columns=split.column_names)
 
-def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, train_args=None, eval_args=None, lora_args=None):
-    train_dataset = format_chat_dataset(dataset[TRAIN_SET_NAME], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
-    val_dataset = format_chat_dataset(dataset[VAL_SET_NAME], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
+def load_accuracy_valid_data():
+    with open(os.path.join(data_dir, data_file_name)) as f:
+        valid_data = json.load(f)  # We need to know the ids for the validation data, so I need to load it from a separate file.
+    return valid_data
+
+def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_dataset=None, val_dataset=None, exclude_unanswerable_questions=False, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, train_args=None, eval_args=None, lora_args=None):
+    if train_dataset is None:
+        train_dataset = format_chat_dataset(dataset[TRAIN_SET_NAME], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function, exclude_unanswerable_questions)
+    if val_dataset is None:
+        val_dataset = format_chat_dataset(dataset[VAL_SET_NAME], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function, exclude_unanswerable_questions)
     
     if lora_args is not None:
         model = get_peft_model(model, lora_args)
@@ -127,11 +136,11 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, knowledg
 
         # Accuracy10
         print("Evaluating Accuracy...")
-        with open(os.path.join(data_dir, data_file_name)) as f:
-            valid_data = json.load(f)  # We need to know the ids for the validation data, so I need to load it from a separate file.
-        accuracy = calculate_score_from_model(model, role_string, valid_data, tokenizer, 
+        valid_data = load_accuracy_valid_data()
+        accuracy = calculate_score_from_model([model], [role_string], valid_data, tokenizer, 
                                               reference_dir, reference_file_name, prediction_dir, f"{model_nickname}_{prediction_file_name}", 
                                               knowledge_graph_retrieval_system=knowledge_graph_retrieval_system, relevancy_value=relevancy_value, table_selection_function=table_selection_function)
+        print("Accuracy Results:")
         print(accuracy)
 
         # Validation loss
@@ -146,7 +155,18 @@ def create_knowledge_graph_retrieval_system(train_dataset=None):
     retrieval_system = RetrievalSystem(schema_graph)
     if train_dataset is not None:
         retrieval_system.train_embeddings(train_dataset, input_name, label_name)
-    return schema_graph, retrieval_system
+    return retrieval_system
+
+def inference_pipeline_evaluation(first_model, second_model, model_nickname, knowledge_graph_retrieval_system, relevancy_value, table_selection_function):
+    print("Evaluating Accuracy...")
+    first_model.eval()
+    second_model.eval()
+    valid_data = load_accuracy_valid_data()
+    accuracy = calculate_score_from_model([first_model, second_model], [answerability_role_string, pipeline_sql_role_string], valid_data, tokenizer, 
+                                        reference_dir, reference_file_name, prediction_dir, f"{model_nickname}_{prediction_file_name}", 
+                                        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system, relevancy_value=relevancy_value, table_selection_function=table_selection_function)
+    print("Accuracy Results:")
+    print(accuracy)
 
 """Get Model Nickname"""
 parser = argparse.ArgumentParser()
@@ -210,8 +230,40 @@ evaluation_args = SFTConfig(
     remove_unused_columns=False
 )
 
-# Change model to train depending on nickname
+def pipeline_train_and_eval(model, model_nickname, relevancy_value):
+    first_model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
+    second_model = model
 
+    train_and_eval_model(
+        model=first_model,
+        tokenizer=tokenizer,
+        role_string=answerability_role_string,
+        model_nickname=model_nickname + "-FirstModel",
+        exclude_unanswerable_questions=False,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=relevancy_value,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=None,
+        lora_args=lora_config
+    )
+    train_and_eval_model(
+        model=second_model,
+        tokenizer=tokenizer,
+        role_string=pipeline_sql_role_string,
+        model_nickname=model_nickname + "-SecondModel",
+        exclude_unanswerable_questions=True,
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=relevancy_value,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=None,
+        lora_args=lora_config
+    )
+
+    inference_pipeline_evaluation(first_model, second_model, evaluation_args)
+
+# Change model to train depending on nickname
 # First wave of tests: Do we need training, and how should we distribute schema information?
 if model_nickname == "Baseline-Model-1_No-Schema-No-Training":
     train_and_eval_model(
@@ -230,7 +282,7 @@ elif model_nickname == "Baseline-Model-2_Full-Schema-No-Training":
         eval_args=evaluation_args
     )
 elif model_nickname == "Baseline-Model-3_Untrained-Graph-Retriever-No-Model-Training":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system()
+    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system()
     train_and_eval_model(
         model=model,
         tokenizer=tokenizer,
@@ -242,7 +294,7 @@ elif model_nickname == "Baseline-Model-3_Untrained-Graph-Retriever-No-Model-Trai
         eval_args=evaluation_args
     )
 elif model_nickname == "Baseline-Model-4_Trained-Graph-Retriever-No-Model-Training":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     train_and_eval_model(
         model=model,
         tokenizer=tokenizer,
@@ -274,7 +326,7 @@ elif model_nickname == "Model-2_Full-Schema-and-Training":
         lora_args=lora_config
     )
 elif model_nickname == "Model-3_Untrained-Graph-Retriever-and-Model-Training":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system()
+    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system()
     train_and_eval_model(
         model=model,
         tokenizer=tokenizer,
@@ -288,7 +340,7 @@ elif model_nickname == "Model-3_Untrained-Graph-Retriever-and-Model-Training":
         lora_args=lora_config
     )
 elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     train_and_eval_model(
         model=model,
         tokenizer=tokenizer,
@@ -302,110 +354,19 @@ elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
         lora_args=lora_config
     )
 # Second wave of tests: Is it a good idea to use a score to decide how many tables to provide for a query? If so, what's a good score?
-elif model_nickname == "Model-A_Relevancy":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
-    train_and_eval_model(
-        model=model,
-        tokenizer=tokenizer,
-        role_string=baseline_role_string,
-        model_nickname="0.5 relevancy_threshold",
-        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=0.5,
-        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
-        train_args=training_args,
-        eval_args=evaluation_args,
-        lora_args=lora_config
-    )
-    train_and_eval_model(
-        model=model,
-        tokenizer=tokenizer,
-        role_string=baseline_role_string,
-        model_nickname="0.55 relevancy_threshold",
-        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=0.55,
-        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
-        train_args=training_args,
-        eval_args=evaluation_args,
-        lora_args=lora_config
-    )
-elif model_nickname == "Model-B_Relevancy":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
-    train_and_eval_model(
-        model=model,
-        tokenizer=tokenizer,
-        role_string=baseline_role_string,
-        model_nickname="0.6 relevancy_threshold",
-        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=0.6,
-        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
-        train_args=training_args,
-        eval_args=evaluation_args,
-        lora_args=lora_config
-    )
-    train_and_eval_model(
-        model=model,
-        tokenizer=tokenizer,
-        role_string=baseline_role_string,
-        model_nickname="0.65 relevancy_threshold",
-        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=0.65,
-        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
-        train_args=training_args,
-        eval_args=evaluation_args,
-        lora_args=lora_config
-    )
-elif model_nickname == "Model-C_Relevancy":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
-    train_and_eval_model(
-        model=model,
-        tokenizer=tokenizer,
-        role_string=baseline_role_string,
-        model_nickname="0.7 relevancy_threshold",
-        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=0.7,
-        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
-        train_args=training_args,
-        eval_args=evaluation_args,
-        lora_args=lora_config
-    )
-    train_and_eval_model(
-        model=model,
-        tokenizer=tokenizer,
-        role_string=baseline_role_string,
-        model_nickname="0.75 relevancy_threshold",
-        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=0.75,
-        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
-        train_args=training_args,
-        eval_args=evaluation_args,
-        lora_args=lora_config
-    )
-elif model_nickname == "Model-D_Relevancy":
-    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
-    train_and_eval_model(
-        model=model,
-        tokenizer=tokenizer,
-        role_string=baseline_role_string,
-        model_nickname="0.8 relevancy_threshold",
-        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=0.8,
-        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
-        train_args=training_args,
-        eval_args=evaluation_args,
-        lora_args=lora_config
-    )
-    train_and_eval_model(
-        model=model,
-        tokenizer=tokenizer,
-        role_string=baseline_role_string,
-        model_nickname="0.85 relevancy_threshold",
-        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
-        relevancy_value=0.85,
-        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
-        train_args=training_args,
-        eval_args=evaluation_args,
-        lora_args=lora_config
-    )    
+# Also, how does the model perform with a pipeline compared to having one model handle everything?
+elif model_nickname == "Pipeline-Low_Relevancy":
+    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    pipeline_train_and_eval(model, "0.5_relevancy_threshold", 0.5)
+elif model_nickname == "Pipeline-Medium_Relevancy":
+    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    pipeline_train_and_eval(model, "0.6_relevancy_threshold", 0.6)
+elif model_nickname == "Pipeline-High_Relevancy":
+    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    pipeline_train_and_eval(model, "0.7_relevancy_threshold", 0.7)
+elif model_nickname == "Pipeline-Very-High_Relevancy":
+    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    pipeline_train_and_eval(model, "0.8_relevancy_threshold", 0.8)
 else:
     print("Model nickname unknown...")
 print("Ending program...")

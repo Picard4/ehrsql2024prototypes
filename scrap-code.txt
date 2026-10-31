@@ -1,0 +1,104 @@
+elif model_nickname == "Model-A_Relevancy":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname="0.5 relevancy_threshold",
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.5,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname="0.55 relevancy_threshold",
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.55,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+elif model_nickname == "Model-B_Relevancy":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname="0.6 relevancy_threshold",
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.6,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname="0.65 relevancy_threshold",
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.65,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+elif model_nickname == "Model-C_Relevancy":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname="0.7 relevancy_threshold",
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.7,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname="0.75 relevancy_threshold",
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.75,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+elif model_nickname == "Model-D_Relevancy":
+    schema_graph, knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname="0.8 relevancy_threshold",
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.8,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
+    train_and_eval_model(
+        model=model,
+        tokenizer=tokenizer,
+        role_string=baseline_role_string,
+        model_nickname="0.85 relevancy_threshold",
+        knowledge_graph_retrieval_system=knowledge_graph_retrieval_system,
+        relevancy_value=0.85,
+        table_selection_function=TableSelectionFunction.retrieve_relevant_tables,
+        train_args=training_args,
+        eval_args=evaluation_args,
+        lora_args=lora_config
+    )
