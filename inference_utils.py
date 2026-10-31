@@ -127,7 +127,7 @@ def calculate_score_from_model(models, role_strings, dataset, tokenizer,
             query = generate_model_prediction(models[0], tokenizer, role_strings[0], example['question'], knowledge_graph_retrieval_system, relevancy_value, table_selection_function)
             results[example['id']] = query
     elif (len(models) == 2):
-        answerability_max_new_tokens = 30
+        answerability_max_new_tokens = 15
         for example in dataset['data']:
             answerability_prediction = generate_model_prediction(models[0], tokenizer, role_strings[0], example['question'], knowledge_graph_retrieval_system, relevancy_value, table_selection_function, answerability_max_new_tokens)
             if answerability_prediction == UNANSWERABLE_STRING:

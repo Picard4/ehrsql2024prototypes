@@ -201,7 +201,7 @@ Output exactly one of these labels:
 - "{UNANSWERABLE_STRING}": the question is unanswerable.
 - "{ANSWERABLE_STRING}": the question can be answered.
 
-Do not output an explanation or an SQL query.
+Do not output an explanation or an SQL query. Only output "{UNANSWERABLE_STRING}" or "{ANSWERABLE_STRING}".
 """
 pipeline_sql_role_string = """You are a Text-to-SQL assistant for the medical database MIMIC-IV, which is designed for PostgreSQL. Output a valid SQL query for the given question."""
 
