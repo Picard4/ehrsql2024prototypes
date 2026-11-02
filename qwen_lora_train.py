@@ -373,40 +373,40 @@ elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
 # Second wave of tests: Is it a good idea to use a score to decide how many tables to provide for a query? If so, what's a good score?
 # Also, how does the model perform with a pipeline compared to having one model handle everything?
 elif model_nickname == "Pipeline-0.5_Relevancy":
-    pipeline_train_and_eval(model, "Pipeline-0.5_Relevancy", 0.5, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(model, "Pipeline-0.55_Relevancy", 0.55, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Pipeline-0.6_Relevancy":
-    pipeline_train_and_eval(model, "Pipeline-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(model, "Pipeline-0.65_Relevancy", 0.65, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Pipeline-0.7_Relevancy":
-    pipeline_train_and_eval(model, "Pipeline-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(model, "Pipeline-0.75_Relevancy", 0.75, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Pipeline-0.8_Relevancy":
-    pipeline_train_and_eval(model, "Pipeline-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(model, "Pipeline-0.85_Relevancy", 0.85, TableSelectionFunction.retrieve_relevant_tables)
 
 elif model_nickname == "Pipeline-3_Tables":
-    pipeline_train_and_eval(model, "Pipeline-3_Tables", 3, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(model, "Pipeline-7_Tables", 7, TableSelectionFunction.retrieve_top_k_tables)
 elif model_nickname == "Pipeline-4_Tables":
-    pipeline_train_and_eval(model, "Pipeline-4_Tables", 4, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(model, "Pipeline-8_Tables", 8, TableSelectionFunction.retrieve_top_k_tables)
 elif model_nickname == "Pipeline-5_Tables":
-    pipeline_train_and_eval(model, "Pipeline-5_Tables", 5, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(model, "Pipeline-9_Tables", 9, TableSelectionFunction.retrieve_top_k_tables)
 elif model_nickname == "Pipeline-6_Tables":
-    pipeline_train_and_eval(model, "Pipeline-6_Tables", 6, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(model, "Pipeline-10_Tables", 10, TableSelectionFunction.retrieve_top_k_tables)
 
 elif model_nickname == "Single-Model-0.5_Relevancy":
-    single_model_train_and_eval(model, "Single-Model-0.5_Relevancy", 0.5, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(model, "Single-Model-0.55_Relevancy", 0.55, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Single-Model-0.6_Relevancy":
-    single_model_train_and_eval(model, "Single-Model-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(model, "Single-Model-0.65_Relevancy", 0.65, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Single-Model-0.7_Relevancy":
-    single_model_train_and_eval(model, "Single-Model-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(model, "Single-Model-0.75_Relevancy", 0.75, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Single-Model-0.8_Relevancy":
-    single_model_train_and_eval(model, "Single-Model-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(model, "Single-Model-0.85_Relevancy", 0.85, TableSelectionFunction.retrieve_relevant_tables)
 
 elif model_nickname == "Single-Model-3_Tables":
-    single_model_train_and_eval(model, "Single-Model-3_Tables", 3, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(model, "Single-Model-7_Tables", 7, TableSelectionFunction.retrieve_top_k_tables)
 elif model_nickname == "Single-Model-4_Tables":
-    single_model_train_and_eval(model, "Single-Model-4_Tables", 4, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(model, "Single-Model-8_Tables", 8, TableSelectionFunction.retrieve_top_k_tables)
 elif model_nickname == "Single-Model-5_Tables":
-    single_model_train_and_eval(model, "Single-Model-5_Tables", 5, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(model, "Single-Model-9_Tables", 9, TableSelectionFunction.retrieve_top_k_tables)
 elif model_nickname == "Single-Model-6_Tables":
-    single_model_train_and_eval(model, "Single-Model-6_Tables", 6, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(model, "Single-Model-10_Tables", 10, TableSelectionFunction.retrieve_top_k_tables)
 
 else:
     print("Model nickname unknown...")
