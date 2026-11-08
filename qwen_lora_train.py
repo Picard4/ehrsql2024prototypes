@@ -161,7 +161,7 @@ def create_knowledge_graph_retrieval_system(train_dataset=None):
     schema_graph = build_mimiciv_knowledge_graph()
     retrieval_system = RetrievalSystem(schema_graph)
     if train_dataset is not None:
-        retrieval_system.train_embeddings(train_dataset, input_name, label_name)
+        retrieval_system.train_embeddings(train_dataset, input_name, label_name, SEED)
     return retrieval_system
 
 """Get Model Nickname"""

@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from sentence_transformers import SentenceTransformer, InputExample, losses
 from torch.utils.data import DataLoader
 
@@ -53,7 +54,14 @@ class RetrievalSystem:
             normalize_embeddings=True
         )
 
-    def train_embeddings(self, train_data, input_name, label_name):
+    def train_embeddings(self, train_data, input_name, label_name, seed=42):
+        # Ensure consistency by using a generator with a set seed.
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        generator = torch.Generator()
+        generator.manual_seed(seed)
+
         most_tables_in_a_query = 0  # Useful metric to know what top_k to use. Seems like 5 is a good number.
         table_documents = {
             document["table"]: document[text_key]
@@ -104,7 +112,8 @@ class RetrievalSystem:
         train_dataloader = DataLoader(
             train_examples,
             shuffle=True,
-            batch_size=16
+            batch_size=16,
+            generator=generator
         )
 
         train_loss = losses.CosineSimilarityLoss(
