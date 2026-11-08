@@ -4,6 +4,7 @@ from sentence_transformers import SentenceTransformer, InputExample, losses
 from torch.utils.data import DataLoader
 import pickle
 import os
+import random
 
 table_key = "table"
 text_key = "text"
@@ -12,6 +13,10 @@ score_key = "score"
 STATE_FILE_NAME = "retriever_state.pkl"
 MODEL_FILE_NAME = "embedding_model"
 
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
 
 class RetrievalSystem:
     def __init__(self, schema_graph):
@@ -119,7 +124,8 @@ class RetrievalSystem:
             train_examples,
             shuffle=True,
             batch_size=16,
-            generator=generator
+            generator=generator,
+            worker_init_fn=seed_worker
         )
 
         train_loss = losses.CosineSimilarityLoss(
