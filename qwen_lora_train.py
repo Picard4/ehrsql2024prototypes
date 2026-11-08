@@ -26,7 +26,9 @@ SEED = 42
 RETRIEVAL_SYSTEM_DIRECTORY = "./retriever_saved"
 
 def get_new_model():
-    return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, attn_implementation="eager")
+    model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, attn_implementation="eager")
+    model.config._attn_implementation = "eager"
+    return model
 
 """Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
