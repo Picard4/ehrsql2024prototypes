@@ -80,11 +80,8 @@ def force_full_determinism(seed=SEED):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    # Print a warning if something non-deterministic is used (the alternative is crashing the program...)
-    try:
-        torch.use_deterministic_algorithms(True, warn_only=True)
-    except AttributeError:
-        pass
+    # Force deterministic algorithms
+    torch.use_deterministic_algorithms(True, warn_only=False)
 
 def get_new_model(tokenizer, model_name):
     model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, attn_implementation="eager")
