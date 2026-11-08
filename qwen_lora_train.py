@@ -388,18 +388,18 @@ elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
 # Also, how does the model perform with a pipeline compared to having one model handle everything?
 elif model_nickname == "Pipeline-0.5_Relevancy":
     pipeline_train_and_eval(model, "Pipeline-0.5_Relevancy", 0.5, TableSelectionFunction.retrieve_relevant_tables)
-elif model_nickname == "Pipeline-0.6_Relevancy":
-    pipeline_train_and_eval(model, "Pipeline-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables)
-elif model_nickname == "Pipeline-0.7_Relevancy":
-    pipeline_train_and_eval(model, "Pipeline-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables)
-elif model_nickname == "Pipeline-0.8_Relevancy":
-    pipeline_train_and_eval(model, "Pipeline-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Pipeline-0.55_Relevancy":
     pipeline_train_and_eval(model, "Pipeline-0.55_Relevancy", 0.55, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Pipeline-0.6_Relevancy":
+    pipeline_train_and_eval(model, "Pipeline-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Pipeline-0.65_Relevancy":
     pipeline_train_and_eval(model, "Pipeline-0.65_Relevancy", 0.65, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Pipeline-0.7_Relevancy":
+    pipeline_train_and_eval(model, "Pipeline-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Pipeline-0.75_Relevancy":
     pipeline_train_and_eval(model, "Pipeline-0.75_Relevancy", 0.75, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Pipeline-0.8_Relevancy":
+    pipeline_train_and_eval(model, "Pipeline-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Pipeline-0.85_Relevancy":
     pipeline_train_and_eval(model, "Pipeline-0.85_Relevancy", 0.85, TableSelectionFunction.retrieve_relevant_tables)
 
@@ -422,18 +422,18 @@ elif model_nickname == "Pipeline-10_Tables":
 
 elif model_nickname == "Single-Model-0.5_Relevancy":
     single_model_train_and_eval(model, "Single-Model-0.5_Relevancy", 0.5, TableSelectionFunction.retrieve_relevant_tables)
-elif model_nickname == "Single-Model-0.6_Relevancy":
-    single_model_train_and_eval(model, "Single-Model-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables)
-elif model_nickname == "Single-Model-0.7_Relevancy":
-    single_model_train_and_eval(model, "Single-Model-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables)
-elif model_nickname == "Single-Model-0.8_Relevancy":
-    single_model_train_and_eval(model, "Single-Model-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Single-Model-0.55_Relevancy":
     single_model_train_and_eval(model, "Single-Model-0.55_Relevancy", 0.55, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Single-Model-0.6_Relevancy":
+    single_model_train_and_eval(model, "Single-Model-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Single-Model-0.65_Relevancy":
     single_model_train_and_eval(model, "Single-Model-0.65_Relevancy", 0.65, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Single-Model-0.7_Relevancy":
+    single_model_train_and_eval(model, "Single-Model-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Single-Model-0.75_Relevancy":
     single_model_train_and_eval(model, "Single-Model-0.75_Relevancy", 0.75, TableSelectionFunction.retrieve_relevant_tables)
+elif model_nickname == "Single-Model-0.8_Relevancy":
+    single_model_train_and_eval(model, "Single-Model-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables)
 elif model_nickname == "Single-Model-0.85_Relevancy":
     single_model_train_and_eval(model, "Single-Model-0.85_Relevancy", 0.85, TableSelectionFunction.retrieve_relevant_tables)
 
