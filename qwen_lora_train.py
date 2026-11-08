@@ -25,6 +25,17 @@ TEST_SET_NAME = "test"
 SEED = 42
 RETRIEVAL_SYSTEM_DIRECTORY = "./retriever_saved"
 
+"""Lock Down Randomness"""
+# Disable TF32 and non-deterministic CUDA attention kernels
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
+
+# Force PyTorch to use deterministic algorithms strictly
+torch.use_deterministic_algorithms(True, warn_only=False)
+
+# Ensure Hugging Face datasets use a fixed seed if shuffled
+os.environ["PYTHONHASHSEED"] = str(SEED)
+
 """Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
