@@ -27,7 +27,8 @@ class RetrievalSystem:
             "sentence-transformers/all-MiniLM-L6-v2"
         )
 
-        for table, data in schema_graph.nodes(data=True):
+        for table in sorted(list(schema_graph.nodes)):
+            data = schema_graph.nodes[table]
             lines = [f"TABLE {table}"]
 
             lines.append("Columns:")
