@@ -2,6 +2,9 @@
 # !{sys.executable} -m pip install "torch<2.5.0" "transformers>=4.42.0" huggingface_hub tiktoken einops transformers_stream_generator datasets accelerate peft ipywidgets trl
 
 import os
+import numpy as np
+import torch
+import random
 import json
 import argparse
 from transformers import AutoModelForCausalLM, AutoTokenizer, EarlyStoppingCallback, set_seed
@@ -58,6 +61,22 @@ dataset = load_dataset("json", features=features, data_files={
     VAL_SET_NAME: processed_val_file
 })
 
+def force_full_determinism(seed=SEED):
+    set_seed(SEED)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    
+    # Force deterministic algorithms in PyTorch
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4000:8"
+    try:
+        torch.use_deterministic_algorithms(True, warn_only=True)
+    except AttributeError:
+        pass
+
 def format_chat_dataset(split, role_string, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, exclude_unanswerable_questions=False):
     answerability_task = is_role_string_for_answerability_task(role_string)
     def format_chat(batch):
@@ -94,7 +113,7 @@ def load_accuracy_valid_data():
     return valid_data
 
 def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_dataset=None, val_dataset=None, exclude_unanswerable_questions=False, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, train_args=None, eval_args=None, lora_args=None):
-    set_seed(SEED)
+    force_full_determinism(SEED)
     if train_dataset is None:
         train_dataset = format_chat_dataset(dataset[TRAIN_SET_NAME], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function, exclude_unanswerable_questions)
     if val_dataset is None:
@@ -159,7 +178,7 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_da
     return model
 
 def create_knowledge_graph_retrieval_system(train_dataset=None):
-    set_seed(SEED)
+    force_full_determinism(SEED)
     schema_graph = build_mimiciv_knowledge_graph()
     retrieval_system = RetrievalSystem(schema_graph)
     if train_dataset is not None:
