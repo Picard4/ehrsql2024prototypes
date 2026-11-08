@@ -25,21 +25,13 @@ TEST_SET_NAME = "test"
 SEED = 42
 RETRIEVAL_SYSTEM_DIRECTORY = "./retriever_saved"
 
-"""Lock Down Randomness"""
-# Disable TF32 and non-deterministic CUDA attention kernels
-torch.backends.cuda.matmul.allow_tf32 = False
-torch.backends.cudnn.allow_tf32 = False
-
-# Force PyTorch to use deterministic algorithms strictly
-torch.use_deterministic_algorithms(True, warn_only=False)
-
-# Ensure Hugging Face datasets use a fixed seed if shuffled
-os.environ["PYTHONHASHSEED"] = str(SEED)
+def get_new_model():
+    return AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, attn_implementation="eager")
 
 """Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
+model = get_new_model()
 
 # pad_token settings to prevent logs from getting flooded
 tokenizer.pad_token = tokenizer.eos_token
@@ -73,7 +65,17 @@ dataset = load_dataset("json", features=features, data_files={
 })
 
 def force_full_determinism(seed=SEED):
-    set_seed(SEED)
+    # Disable TF32 and non-deterministic CUDA attention kernels
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
+
+    # Force PyTorch to use deterministic algorithms strictly
+    torch.use_deterministic_algorithms(True, warn_only=False)
+
+    # Ensure Hugging Face datasets use a fixed seed if shuffled
+    os.environ["PYTHONHASHSEED"] = str(seed)
+
+    set_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -82,7 +84,7 @@ def force_full_determinism(seed=SEED):
     # Force deterministic algorithms in PyTorch
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4000:8"
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
     try:
         torch.use_deterministic_algorithms(True, warn_only=True)
     except AttributeError:
@@ -280,7 +282,7 @@ def single_model_train_and_eval(model, model_nickname, relevancy_value, table_se
 
 def pipeline_train_and_eval(model, model_nickname, relevancy_value, table_selection_function):
     knowledge_graph_retrieval_system = RetrievalSystem.load(RETRIEVAL_SYSTEM_DIRECTORY)
-    first_model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
+    first_model = get_new_model()
     second_model = model
 
     first_model = train_and_eval_model(
