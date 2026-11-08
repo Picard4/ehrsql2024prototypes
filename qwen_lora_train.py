@@ -18,7 +18,9 @@ from rag_knowledge_graph_retrieval import RetrievalSystem
 TRAIN_SET_NAME = "train"
 VAL_SET_NAME = "val"
 TEST_SET_NAME = "test"
+
 SEED = 42
+RETRIEVAL_SYSTEM_DIRECTORY = "./retriever_saved"
 
 """Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
@@ -232,7 +234,7 @@ evaluation_args = SFTConfig(
 )
 
 def single_model_train_and_eval(model, model_nickname, relevancy_value, table_selection_function):
-    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    knowledge_graph_retrieval_system = RetrievalSystem.load(RETRIEVAL_SYSTEM_DIRECTORY)
     train_and_eval_model(
         model=model,
         tokenizer=tokenizer,
@@ -247,7 +249,7 @@ def single_model_train_and_eval(model, model_nickname, relevancy_value, table_se
     )
 
 def pipeline_train_and_eval(model, model_nickname, relevancy_value, table_selection_function):
-    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    knowledge_graph_retrieval_system = RetrievalSystem.load(RETRIEVAL_SYSTEM_DIRECTORY)
     first_model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
     second_model = model
 
@@ -287,6 +289,10 @@ def pipeline_train_and_eval(model, model_nickname, relevancy_value, table_select
                                         knowledge_graph_retrieval_system=knowledge_graph_retrieval_system, relevancy_value=relevancy_value, table_selection_function=table_selection_function)
     print("Accuracy Results:")
     print(accuracy)
+
+def train_and_save_knowledge_graph_retrieval_system():
+    knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
+    knowledge_graph_retrieval_system.save(RETRIEVAL_SYSTEM_DIRECTORY)
 
 # Change model to train depending on nickname
 # First wave of tests: Do we need training, and how should we distribute schema information?
@@ -448,6 +454,10 @@ elif model_nickname == "Single-Model-9_Tables":
     single_model_train_and_eval(model, "Single-Model-9_Tables", 9, TableSelectionFunction.retrieve_top_k_tables)
 elif model_nickname == "Single-Model-10_Tables":
     single_model_train_and_eval(model, "Single-Model-10_Tables", 10, TableSelectionFunction.retrieve_top_k_tables)
+
+# This option is for training a RAG retrieval system for use in other experiments.
+elif model_nickname == "Retrieval-System":
+    train_and_save_knowledge_graph_retrieval_system()
 
 else:
     print("Model nickname unknown...")

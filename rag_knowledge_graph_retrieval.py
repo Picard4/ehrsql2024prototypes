@@ -2,19 +2,25 @@ import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer, InputExample, losses
 from torch.utils.data import DataLoader
+import pickle
+import os
 
 table_key = "table"
 text_key = "text"
 score_key = "score"
 
+STATE_FILE_NAME = "retriever_state.pkl"
+MODEL_FILE_NAME = "embedding_model"
+
+
 class RetrievalSystem:
     def __init__(self, schema_graph):
         self.schema_graph = schema_graph
         self.document_embeddings = None
+        self.documents = []
         self.embedding_model = SentenceTransformer(
             "sentence-transformers/all-MiniLM-L6-v2"
         )
-        self.documents = []
 
         for table, data in schema_graph.nodes(data=True):
             lines = [f"TABLE {table}"]
@@ -169,3 +175,37 @@ class RetrievalSystem:
         else:
             top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
         return self.get_chosen_tables(scores, top_indices)
+
+    def save(self, save_dir="./retriever_saved"):
+        os.makedirs(save_dir, exist_ok=True)
+        
+        # 1. Save the underlying SentenceTransformer model natively
+        self.embedding_model.save(os.path.join(save_dir, MODEL_FILE_NAME))
+        
+        # 2. Save documents, embeddings, and schema graph using pickle
+        state = {
+            "documents": self.documents,
+            "document_embeddings": self.document_embeddings,
+            "schema_graph": self.schema_graph
+        }
+        with open(os.path.join(save_dir, STATE_FILE_NAME), "wb") as f:
+            pickle.dump(state, f)
+        print(f"RetrievalSystem saved to {save_dir}")
+
+    @classmethod
+    def load(cls, save_dir="./retriever_saved"):
+        # 1. Load state metadata
+        with open(os.path.join(save_dir, STATE_FILE_NAME), "rb") as f:
+            state = pickle.load(f)
+            
+        # 2. Instantiate object bypassing __init__ or re-initializing lightly
+        instance = cls.__new__(cls)
+        instance.schema_graph = state["schema_graph"]
+        instance.documents = state["documents"]
+        instance.document_embeddings = state["document_embeddings"]
+        
+        # 3. Load the SentenceTransformer model
+        instance.embedding_model = SentenceTransformer(os.path.join(save_dir, MODEL_FILE_NAME))
+        
+        print(f"RetrievalSystem loaded from {save_dir}")
+        return instance
