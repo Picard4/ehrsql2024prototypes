@@ -4,7 +4,7 @@
 import os
 import json
 import argparse
-from transformers import AutoModelForCausalLM, AutoTokenizer, EarlyStoppingCallback
+from transformers import AutoModelForCausalLM, AutoTokenizer, EarlyStoppingCallback, set_seed
 from datasets import load_dataset, Features, Value
 from peft import LoraConfig, get_peft_model
 from trl import SFTConfig, SFTTrainer
@@ -18,6 +18,7 @@ from rag_knowledge_graph_retrieval import RetrievalSystem
 TRAIN_SET_NAME = "train"
 VAL_SET_NAME = "val"
 TEST_SET_NAME = "test"
+SEED = 42
 
 """Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
@@ -91,6 +92,7 @@ def load_accuracy_valid_data():
     return valid_data
 
 def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_dataset=None, val_dataset=None, exclude_unanswerable_questions=False, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, train_args=None, eval_args=None, lora_args=None):
+    set_seed(SEED)
     if train_dataset is None:
         train_dataset = format_chat_dataset(dataset[TRAIN_SET_NAME], role_string, knowledge_graph_retrieval_system, relevancy_value, table_selection_function, exclude_unanswerable_questions)
     if val_dataset is None:
@@ -188,6 +190,9 @@ lora_config = LoraConfig(
 )
 
 training_args = SFTConfig(
+    seed=SEED,
+    data_seed=SEED,
+
     num_train_epochs=6,
     per_device_train_batch_size=1,
     per_device_eval_batch_size=per_device_eval_batch_size,
@@ -215,6 +220,8 @@ training_args = SFTConfig(
 )
 
 evaluation_args = SFTConfig(
+    seed=SEED,
+    data_seed=SEED,
     per_device_eval_batch_size=per_device_eval_batch_size,
     report_to=report_to,
     fp16=fp16,
