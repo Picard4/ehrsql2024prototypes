@@ -157,6 +157,7 @@ def train_and_eval_model(model, tokenizer, role_string, model_nickname, train_da
     return model
 
 def create_knowledge_graph_retrieval_system(train_dataset=None):
+    set_seed(SEED)
     schema_graph = build_mimiciv_knowledge_graph()
     retrieval_system = RetrievalSystem(schema_graph)
     if train_dataset is not None:
