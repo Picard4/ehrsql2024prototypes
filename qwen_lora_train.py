@@ -80,8 +80,8 @@ def force_full_determinism(seed=SEED):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    # Force deterministic algorithms
-    torch.use_deterministic_algorithms(True, warn_only=False)
+    # Force deterministic algorithms? This is actually a bad idea since it can lead to numerican imprecision...
+    # torch.use_deterministic_algorithms(True, warn_only=False)
 
 def get_new_model(tokenizer, model_name):
     model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, attn_implementation="eager")
@@ -206,7 +206,8 @@ model_nickname = args.model_nickname
 """Training and LoRA Arguments"""
 # Shared arguments
 top_k_tables_for_first_wave_models=5
-fp16=True
+fp16=False
+bf16=True
 max_length=2048
 per_device_eval_batch_size=1
 assistant_only_loss=True
@@ -247,6 +248,7 @@ training_args = SFTConfig(
 
     learning_rate=1e-4,
     fp16=fp16,
+    bf16=bf16,
     gradient_checkpointing=True,
     gradient_accumulation_steps=16,
     report_to=report_to,
@@ -261,6 +263,7 @@ evaluation_args = SFTConfig(
     dataloader_num_workers=0,
     report_to=report_to,
     fp16=fp16,
+    bf16=bf16,
     assistant_only_loss=assistant_only_loss,
     max_length=max_length,
     remove_unused_columns=False
