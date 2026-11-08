@@ -2,6 +2,11 @@
 # !{sys.executable} -m pip install "torch<2.5.0" "transformers>=4.42.0" huggingface_hub tiktoken einops transformers_stream_generator datasets accelerate peft ipywidgets trl
 
 import os
+
+# Lock randomness before importing torch
+os.environ["PYTHONHASHSEED"] = "42"
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
 import numpy as np
 import torch
 import random
@@ -25,13 +30,7 @@ TEST_SET_NAME = "test"
 SEED = 42
 RETRIEVAL_SYSTEM_DIRECTORY = "./retriever_saved"
 
-def get_new_model(tokenizer):
-    model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, attn_implementation="eager")
-    model.config._attn_implementation = "eager"
-    model.generation_config.pad_token_id = tokenizer.pad_token_id
-    return model
-
-"""Model and Tokenizer Instantiation (and Role String + Jinja modifications)"""
+"""Tokenizer Instantiation (and Role String + Jinja modifications)"""
 model_name = "Qwen/Qwen2.5-1.5B"
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
@@ -70,12 +69,7 @@ def force_full_determinism(seed=SEED):
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
 
-    # Force PyTorch to use deterministic algorithms strictly
-    torch.use_deterministic_algorithms(True, warn_only=False)
-
-    # Ensure Hugging Face datasets use a fixed seed if shuffled
-    os.environ["PYTHONHASHSEED"] = str(seed)
-
+    # Initialize seeds
     set_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
@@ -85,11 +79,18 @@ def force_full_determinism(seed=SEED):
     # Force deterministic algorithms in PyTorch
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
+    # Print a warning if something non-deterministic is used (the alternative is crashing the program...)
     try:
         torch.use_deterministic_algorithms(True, warn_only=True)
     except AttributeError:
         pass
+
+def get_new_model(tokenizer, model_name):
+    model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True, attn_implementation="eager")
+    model.config._attn_implementation = "eager"
+    model.generation_config.pad_token_id = tokenizer.pad_token_id
+    return model
 
 def format_chat_dataset(split, role_string, knowledge_graph_retrieval_system=None, relevancy_value=None, table_selection_function=None, exclude_unanswerable_questions=False):
     answerability_task = is_role_string_for_answerability_task(role_string)
@@ -268,8 +269,8 @@ evaluation_args = SFTConfig(
     remove_unused_columns=False
 )
 
-def single_model_train_and_eval(tokenizer, model_nickname, relevancy_value, table_selection_function):
-    model = get_new_model(tokenizer)
+def single_model_train_and_eval(tokenizer, model_name, model_nickname, relevancy_value, table_selection_function, training_args, evaluation_args, lora_config):
+    model = get_new_model(tokenizer, model_name)
     knowledge_graph_retrieval_system = RetrievalSystem.load(RETRIEVAL_SYSTEM_DIRECTORY)
     train_and_eval_model(
         model=model,
@@ -284,10 +285,10 @@ def single_model_train_and_eval(tokenizer, model_nickname, relevancy_value, tabl
         lora_args=lora_config
     )
 
-def pipeline_train_and_eval(tokenizer, model_nickname, relevancy_value, table_selection_function):
+def pipeline_train_and_eval(tokenizer, model_name, model_nickname, relevancy_value, table_selection_function, training_args, lora_config):
     knowledge_graph_retrieval_system = RetrievalSystem.load(RETRIEVAL_SYSTEM_DIRECTORY)
-    first_model = get_new_model(tokenizer)
-    second_model = get_new_model(tokenizer)
+    first_model = get_new_model(tokenizer, model_name)
+    second_model = get_new_model(tokenizer, model_name)
 
     first_model = train_and_eval_model(
         model=first_model,
@@ -334,7 +335,7 @@ def train_and_save_knowledge_graph_retrieval_system():
 # First wave of tests: Do we need training, and how should we distribute schema information?
 if model_nickname == "Baseline-Model-1_No-Schema-No-Training":
     train_and_eval_model(
-        model=get_new_model(tokenizer),
+        model=get_new_model(tokenizer, model_name),
         tokenizer=tokenizer,
         role_string=baseline_role_string,
         model_nickname=model_nickname,
@@ -342,7 +343,7 @@ if model_nickname == "Baseline-Model-1_No-Schema-No-Training":
     )
 elif model_nickname == "Baseline-Model-2_Full-Schema-No-Training":
     train_and_eval_model(
-        model=get_new_model(tokenizer),
+        model=get_new_model(tokenizer, model_name),
         tokenizer=tokenizer,
         role_string=schema_role_string,
         model_nickname=model_nickname,
@@ -351,7 +352,7 @@ elif model_nickname == "Baseline-Model-2_Full-Schema-No-Training":
 elif model_nickname == "Baseline-Model-3_Untrained-Graph-Retriever-No-Model-Training":
     knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system()
     train_and_eval_model(
-        model=get_new_model(tokenizer),
+        model=get_new_model(tokenizer, model_name),
         tokenizer=tokenizer,
         role_string=baseline_role_string,
         model_nickname=model_nickname,
@@ -363,7 +364,7 @@ elif model_nickname == "Baseline-Model-3_Untrained-Graph-Retriever-No-Model-Trai
 elif model_nickname == "Baseline-Model-4_Trained-Graph-Retriever-No-Model-Training":
     knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     train_and_eval_model(
-        model=get_new_model(tokenizer),
+        model=get_new_model(tokenizer, model_name),
         tokenizer=tokenizer,
         role_string=baseline_role_string,
         model_nickname=model_nickname,
@@ -374,7 +375,7 @@ elif model_nickname == "Baseline-Model-4_Trained-Graph-Retriever-No-Model-Traini
     )
 elif model_nickname == "Model-1_Training-Only-No-Schema":
     train_and_eval_model(
-        model=get_new_model(tokenizer),
+        model=get_new_model(tokenizer, model_name),
         tokenizer=tokenizer,
         role_string=baseline_role_string,
         model_nickname=model_nickname,
@@ -384,7 +385,7 @@ elif model_nickname == "Model-1_Training-Only-No-Schema":
     )
 elif model_nickname == "Model-2_Full-Schema-and-Training":
     train_and_eval_model(
-        model=get_new_model(tokenizer),
+        model=get_new_model(tokenizer, model_name),
         tokenizer=tokenizer,
         role_string=schema_role_string,
         model_nickname=model_nickname,
@@ -395,7 +396,7 @@ elif model_nickname == "Model-2_Full-Schema-and-Training":
 elif model_nickname == "Model-3_Untrained-Graph-Retriever-and-Model-Training":
     knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system()
     train_and_eval_model(
-        model=get_new_model(tokenizer),
+        model=get_new_model(tokenizer, model_name),
         tokenizer=tokenizer,
         role_string=baseline_role_string,
         model_nickname=model_nickname,
@@ -409,7 +410,7 @@ elif model_nickname == "Model-3_Untrained-Graph-Retriever-and-Model-Training":
 elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
     knowledge_graph_retrieval_system = create_knowledge_graph_retrieval_system(dataset[TRAIN_SET_NAME])
     train_and_eval_model(
-        model=get_new_model(tokenizer),
+        model=get_new_model(tokenizer, model_name),
         tokenizer=tokenizer,
         role_string=baseline_role_string,
         model_nickname=model_nickname,
@@ -423,73 +424,73 @@ elif model_nickname == "Model-4_Trained-Graph-Retriever-and-Model-Training":
 # Second wave of tests: Is it a good idea to use a score to decide how many tables to provide for a query? If so, what's a good score?
 # Also, how does the model perform with a pipeline compared to having one model handle everything?
 elif model_nickname == "Pipeline-0.5_Relevancy":
-    pipeline_train_and_eval(tokenizer, "Pipeline-0.5_Relevancy", 0.5, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-0.5_Relevancy", 0.5, TableSelectionFunction.retrieve_relevant_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-0.55_Relevancy":
-    pipeline_train_and_eval(tokenizer, "Pipeline-0.55_Relevancy", 0.55, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-0.55_Relevancy", 0.55, TableSelectionFunction.retrieve_relevant_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-0.6_Relevancy":
-    pipeline_train_and_eval(tokenizer, "Pipeline-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-0.65_Relevancy":
-    pipeline_train_and_eval(tokenizer, "Pipeline-0.65_Relevancy", 0.65, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-0.65_Relevancy", 0.65, TableSelectionFunction.retrieve_relevant_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-0.7_Relevancy":
-    pipeline_train_and_eval(tokenizer, "Pipeline-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-0.75_Relevancy":
-    pipeline_train_and_eval(tokenizer, "Pipeline-0.75_Relevancy", 0.75, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-0.75_Relevancy", 0.75, TableSelectionFunction.retrieve_relevant_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-0.8_Relevancy":
-    pipeline_train_and_eval(tokenizer, "Pipeline-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-0.85_Relevancy":
-    pipeline_train_and_eval(tokenizer, "Pipeline-0.85_Relevancy", 0.85, TableSelectionFunction.retrieve_relevant_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-0.85_Relevancy", 0.85, TableSelectionFunction.retrieve_relevant_tables, training_args, lora_config)
 
 elif model_nickname == "Pipeline-3_Tables":
-    pipeline_train_and_eval(tokenizer, "Pipeline-3_Tables", 3, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-3_Tables", 3, TableSelectionFunction.retrieve_top_k_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-4_Tables":
-    pipeline_train_and_eval(tokenizer, "Pipeline-4_Tables", 4, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-4_Tables", 4, TableSelectionFunction.retrieve_top_k_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-5_Tables":
-    pipeline_train_and_eval(tokenizer, "Pipeline-5_Tables", 5, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-5_Tables", 5, TableSelectionFunction.retrieve_top_k_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-6_Tables":
-    pipeline_train_and_eval(tokenizer, "Pipeline-6_Tables", 6, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-6_Tables", 6, TableSelectionFunction.retrieve_top_k_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-7_Tables":
-    pipeline_train_and_eval(tokenizer, "Pipeline-7_Tables", 7, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-7_Tables", 7, TableSelectionFunction.retrieve_top_k_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-8_Tables":
-    pipeline_train_and_eval(tokenizer, "Pipeline-8_Tables", 8, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-8_Tables", 8, TableSelectionFunction.retrieve_top_k_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-9_Tables":
-    pipeline_train_and_eval(tokenizer, "Pipeline-9_Tables", 9, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-9_Tables", 9, TableSelectionFunction.retrieve_top_k_tables, training_args, lora_config)
 elif model_nickname == "Pipeline-10_Tables":
-    pipeline_train_and_eval(tokenizer, "Pipeline-10_Tables", 10, TableSelectionFunction.retrieve_top_k_tables)
+    pipeline_train_and_eval(tokenizer, model_name, "Pipeline-10_Tables", 10, TableSelectionFunction.retrieve_top_k_tables, training_args, lora_config)
 
 elif model_nickname == "Single-Model-0.5_Relevancy":
-    single_model_train_and_eval(tokenizer, "Single-Model-0.5_Relevancy", 0.5, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.5_Relevancy", 0.5, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.55_Relevancy":
-    single_model_train_and_eval(tokenizer, "Single-Model-0.55_Relevancy", 0.55, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.55_Relevancy", 0.55, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.6_Relevancy":
-    single_model_train_and_eval(tokenizer, "Single-Model-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.65_Relevancy":
-    single_model_train_and_eval(tokenizer, "Single-Model-0.65_Relevancy", 0.65, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.65_Relevancy", 0.65, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.7_Relevancy":
-    single_model_train_and_eval(tokenizer, "Single-Model-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.75_Relevancy":
-    single_model_train_and_eval(tokenizer, "Single-Model-0.75_Relevancy", 0.75, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.75_Relevancy", 0.75, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.8_Relevancy":
-    single_model_train_and_eval(tokenizer, "Single-Model-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.8_Relevancy", 0.8, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.85_Relevancy":
-    single_model_train_and_eval(tokenizer, "Single-Model-0.85_Relevancy", 0.85, TableSelectionFunction.retrieve_relevant_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.85_Relevancy", 0.85, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 
 
 elif model_nickname == "Single-Model-3_Tables":
-    single_model_train_and_eval(tokenizer, "Single-Model-3_Tables", 3, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-3_Tables", 3, TableSelectionFunction.retrieve_top_k_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-4_Tables":
-    single_model_train_and_eval(tokenizer, "Single-Model-4_Tables", 4, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-4_Tables", 4, TableSelectionFunction.retrieve_top_k_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-5_Tables":
-    single_model_train_and_eval(tokenizer, "Single-Model-5_Tables", 5, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-5_Tables", 5, TableSelectionFunction.retrieve_top_k_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-6_Tables":
-    single_model_train_and_eval(tokenizer, "Single-Model-6_Tables", 6, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-6_Tables", 6, TableSelectionFunction.retrieve_top_k_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-7_Tables":
-    single_model_train_and_eval(tokenizer, "Single-Model-7_Tables", 7, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-7_Tables", 7, TableSelectionFunction.retrieve_top_k_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-8_Tables":
-    single_model_train_and_eval(tokenizer, "Single-Model-8_Tables", 8, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-8_Tables", 8, TableSelectionFunction.retrieve_top_k_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-9_Tables":
-    single_model_train_and_eval(tokenizer, "Single-Model-9_Tables", 9, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-9_Tables", 9, TableSelectionFunction.retrieve_top_k_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-10_Tables":
-    single_model_train_and_eval(tokenizer, "Single-Model-10_Tables", 10, TableSelectionFunction.retrieve_top_k_tables)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-10_Tables", 10, TableSelectionFunction.retrieve_top_k_tables, training_args, evaluation_args, lora_config)
 
 # This option is for training a RAG retrieval system for use in other experiments.
 elif model_nickname == "Retrieval-System":
