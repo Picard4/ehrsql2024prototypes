@@ -458,13 +458,13 @@ elif model_nickname == "Pipeline-10_Tables":
     pipeline_train_and_eval(tokenizer, model_name, "Pipeline-10_Tables", 10, TableSelectionFunction.retrieve_top_k_tables, training_args, lora_config)
 
 elif model_nickname == "Single-Model-0.5_Relevancy":
-    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.5_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.5_Relevancy", 0.5, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.55_Relevancy":
-    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.55_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.55_Relevancy", 0.55, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.6_Relevancy":
     single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.6_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.65_Relevancy":
-    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.65_Relevancy", 0.6, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
+    single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.65_Relevancy", 0.65, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.7_Relevancy":
     single_model_train_and_eval(tokenizer, model_name, "Single-Model-0.7_Relevancy", 0.7, TableSelectionFunction.retrieve_relevant_tables, training_args, evaluation_args, lora_config)
 elif model_nickname == "Single-Model-0.75_Relevancy":
