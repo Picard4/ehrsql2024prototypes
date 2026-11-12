@@ -3,8 +3,7 @@
 
 import os
 
-# Lock randomness before importing torch
-os.environ["PYTHONHASHSEED"] = "42"
+# Set workspace configuration to help with determinism
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
 import numpy as np
@@ -27,7 +26,7 @@ TRAIN_SET_NAME = "train"
 VAL_SET_NAME = "val"
 TEST_SET_NAME = "test"
 
-SEED = 42
+SEED = 123
 RETRIEVAL_SYSTEM_DIRECTORY = "./retriever_saved"
 
 """Tokenizer Instantiation (and Role String + Jinja modifications)"""
