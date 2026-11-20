@@ -80,7 +80,7 @@ def force_full_determinism(seed=SEED):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    # Force deterministic algorithms? This is actually a bad idea since it can lead to numerican imprecision...
+    # Force deterministic algorithms? This is actually a bad idea since it can lead to numerical imprecision...
     # torch.use_deterministic_algorithms(True, warn_only=False)
 
 def get_new_model(tokenizer, model_name):
