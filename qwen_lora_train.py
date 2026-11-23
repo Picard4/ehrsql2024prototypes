@@ -4,7 +4,7 @@
 import os
 
 # Set workspace configuration to help with determinism
-os.environ["PYTHONHASHSEED"] = "55"  # This is probably useless, but I'd have to do a randomness test to confirm...
+os.environ["PYTHONHASHSEED"] = "1"  # This is probably useless, but I'd have to do a randomness test to confirm...
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"  # This is just here to protect me if I forgot to configure the environment variable server-side.
 
 import numpy as np
@@ -27,7 +27,7 @@ TRAIN_SET_NAME = "train"
 VAL_SET_NAME = "val"
 TEST_SET_NAME = "test"
 
-SEED = 55
+SEED = 1
 RETRIEVAL_SYSTEM_DIRECTORY = "./retriever_saved"
 
 """Tokenizer Instantiation (and Role String + Jinja modifications)"""
